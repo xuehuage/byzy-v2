@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Form, Input, Select, Button, Table, Badge, Space, Typography, Modal, message, InputNumber, Row, Col } from 'antd'
+import { Card, Form, Input, Button, Table, Space, Typography, Modal, message, InputNumber, Row, Col } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, EditOutlined, FileSearchOutlined, UploadOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import ExcelUploader from '../components/ExcelUploader'
 import type { StudentData, SchoolStats } from '../types'
 import { getSchoolStats, importSchoolData, exportSchoolData } from '../services/api'
 import ExcelJS from 'exceljs'
 
-const { Option } = Select
 const { Title } = Typography
 
 // Mock Data

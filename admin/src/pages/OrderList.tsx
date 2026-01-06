@@ -176,7 +176,7 @@ const OrderList: React.FC = () => {
         {
             title: '操作',
             key: 'action',
-            render: (_, record) => (
+            render: (_) => (
                 <Space size="middle">
                     <Button type="link" size="small">查看详情</Button>
                 </Space>
