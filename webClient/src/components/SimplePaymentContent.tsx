@@ -21,7 +21,7 @@ interface StoredOrder {
     studentIdNumber: string;
 }
 
-export default function SimplePaymentContent() {
+export default function SimplePaymentContent({ schoolId }: { schoolId?: string }) {
     const searchParams = useSearchParams();
     const router = useRouter();
 
@@ -336,7 +336,7 @@ export default function SimplePaymentContent() {
     };
 
     // 返回首页
-    const handleGoHome = () => router.push('/');
+    const handleGoHome = () => router.push(`/${schoolId || ''}`);
 
     // 获取支付方式文本
     const getPaymentMethodText = () => {
@@ -412,7 +412,7 @@ export default function SimplePaymentContent() {
                     <div className="text-center text-red-500 mb-6">
                         <p>{error}</p>
                         <button
-                            onClick={() => router.push('/')}
+                            onClick={() => router.push(`/${schoolId || ''}`)}
                             className="mt-4 text-blue-600 hover:underline"
                         >
                             返回首页
