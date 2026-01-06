@@ -45,7 +45,8 @@ class GlobalWebSocketManager {
             this.ws = null;
         }
 
-        const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3000'}?client_sn=${clientSn}`;
+        const baseUrl = (process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3000').replace(/\/$/, '');
+        const wsUrl = `${baseUrl}/ws?client_sn=${clientSn}`;
 
         try {
             console.log(`🔗 尝试连接 WebSocket: ${wsUrl}`);
