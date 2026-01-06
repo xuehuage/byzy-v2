@@ -148,7 +148,11 @@ const SchoolList: React.FC = () => {
                     { header: '付款状态', key: 'status', width: 15 }
                 ]
 
-                worksheet.addRows(data)
+                const formattedData = data.map((item: any) => ({
+                    ...item,
+                    totalAmount: Number(item.totalAmount) / 100
+                }))
+                worksheet.addRows(formattedData)
 
                 // Style header
                 worksheet.getRow(1).font = { bold: true }
@@ -224,7 +228,7 @@ const SchoolList: React.FC = () => {
             key: 'totalRevenue',
             width: 120,
             align: 'right',
-            render: (val) => `¥${val.toLocaleString()}`,
+            render: (val) => `¥${(Number(val) / 100).toLocaleString()}`,
         },
         {
             title: '已付款',
@@ -233,7 +237,7 @@ const SchoolList: React.FC = () => {
             width: 120,
             align: 'right',
             className: 'text-green-600',
-            render: (val) => `¥${val.toLocaleString()}`,
+            render: (val) => `¥${(Number(val) / 100).toLocaleString()}`,
         },
         {
             title: '未付款',
@@ -242,7 +246,7 @@ const SchoolList: React.FC = () => {
             width: 120,
             align: 'right',
             className: 'text-red-600',
-            render: (val) => `¥${val.toLocaleString()}`,
+            render: (val) => `¥${(Number(val) / 100).toLocaleString()}`,
         },
 
         {

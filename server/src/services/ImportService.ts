@@ -28,7 +28,7 @@ export class ImportService {
                     const product = new Product()
                     product.schoolId = school.id
                     product.type = p.type
-                    product.price = p.price
+                    product.price = Math.round(Number(p.price) * 100)
                     // Set product name based on type
                     if (p.type === 0) product.name = "夏装"
                     else if (p.type === 1) product.name = "春秋装"
@@ -105,7 +105,7 @@ export class ImportService {
                     // 创建订单 (Create Order)
                     const order = new Order()
                     order.studentId = savedStudent.id
-                    order.orderNo = `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+                    order.orderNo = `SID${savedStudent.id}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
                     order.totalAmount = totalAmount
                     order.status = OrderStatus.PENDING
                     const savedOrder = await transactionalEntityManager.save(order)

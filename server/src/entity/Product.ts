@@ -15,7 +15,7 @@ export class Product {
     @Column()
     name!: string
 
-    @Column("decimal", { precision: 10, scale: 2 })
+    @Column({ type: "int", comment: "Price in cents" })
     price!: number
 
     @CreateDateColumn({ name: 'created_at' })

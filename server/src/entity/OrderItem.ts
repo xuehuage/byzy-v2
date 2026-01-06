@@ -16,7 +16,7 @@ export class OrderItem {
     @Column()
     quantity!: number
 
-    @Column("decimal", { precision: 10, scale: 2, name: 'price_snapshot' })
+    @Column({ type: "int", name: 'price_snapshot', comment: "Price in cents" })
     priceSnapshot!: number
 
     @CreateDateColumn({ name: 'created_at' })

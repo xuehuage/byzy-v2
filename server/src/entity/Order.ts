@@ -19,7 +19,7 @@ export class Order {
     @Column({ name: 'order_no', unique: true })
     orderNo!: string
 
-    @Column("decimal", { precision: 10, scale: 2, name: 'total_amount' })
+    @Column({ type: "int", name: 'total_amount', comment: "Total amount in cents" })
     totalAmount!: number
 
     @Column({
@@ -34,6 +34,9 @@ export class Order {
 
     @Column({ name: 'transaction_id', nullable: true })
     transactionId!: string
+
+    @Column({ name: 'client_sn', nullable: true })
+    clientSn!: string
 
     @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
     paidAt!: Date | null

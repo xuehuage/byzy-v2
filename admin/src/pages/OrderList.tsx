@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Form, Select, Button, Table, Tag, Space, Typography, message } from 'antd'
+import { Card, Form, Select, Button, Table, Tag, Space, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { getSchoolList, getOrderList } from '../services/api'
@@ -69,7 +69,6 @@ const OrderList: React.FC = () => {
             }
         } catch (error) {
             console.error("Fetch orders failed", error)
-            message.error("获取订单列表失败")
         } finally {
             setLoading(false)
         }
@@ -147,7 +146,7 @@ const OrderList: React.FC = () => {
             title: '总金额',
             dataIndex: 'totalAmount',
             key: 'totalAmount',
-            render: (amount) => `¥ ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            render: (amount) => `¥ ${(Number(amount) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
             align: 'right',
         },
         {

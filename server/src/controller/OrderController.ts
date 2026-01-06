@@ -41,15 +41,13 @@ export class OrderController {
                 }
                 const pType = typeMap[uniformType as string]
                 if (pType !== undefined) {
-                    // Filter orders that have at least one item of the specified type
                     queryBuilder.andWhere(qb => {
                         const subQuery = qb.subQuery()
                             .select("oi.order_id")
                             .from("order_items", "oi")
                             .innerJoin("products", "p", "oi.product_id = p.id")
                             .where("p.type = :pType", { pType })
-                            .getQuery()
-                        return "order.id IN " + subQuery
+                        return "order.id IN (" + subQuery.getQuery() + ")"
                     })
                 }
             }
@@ -72,6 +70,7 @@ export class OrderController {
 
                 return {
                     ...order,
+                    totalAmount: order.totalAmount,
                     summerQty,
                     springQty,
                     winterQty
@@ -87,7 +86,7 @@ export class OrderController {
                     pageSize: Number(pageSize)
                 }
             })
-        } catch (error) {
+        } catch (error: any) {
             console.error("Search orders error:", error)
             res.status(500).json({ code: 500, message: "Internal server error" })
         }

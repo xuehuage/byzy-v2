@@ -1,0 +1,29 @@
+{
+  "name": "byzy-mall",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev  -p 3001",
+    "build": "next build ",
+    "start": "next start  -p 3001"
+  },
+  "dependencies": {
+    "antd": "^5.27.6",
+    "axios": "^1.12.2",
+    "next": "15.5.7",
+    "qrcode.react": "^4.2.0",
+    "react": "19.2.2",
+    "react-dom": "19.2.2"
+   
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.18",
+    "typescript": "^5"
+  }
+}

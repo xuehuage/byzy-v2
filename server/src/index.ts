@@ -2,19 +2,26 @@ import "reflect-metadata"
 import express from "express"
 import cors from "cors"
 import dotenv from "dotenv"
+import { createServer } from "http"
 import { AppDataSource } from "./data-source"
 import authRoutes from "./routes/authRoutes"
 import importRoutes from "./routes/importRoutes"
 import appRoutes from "./routes"
 import { rateLimit } from "express-rate-limit"
+import { WebSocketService } from "./websocket"
 
 dotenv.config()
 
 const app = express()
+app.use(cors())
+const server = createServer(app)
 const PORT = process.env.PORT || 3000
 
-app.use(cors())
-app.use(express.json())
+app.use(express.json({
+    verify: (req: any, res, buf) => {
+        req.rawBody = buf
+    }
+}))
 
 // Rate limiter for login
 const loginLimiter = rateLimit({
@@ -34,7 +41,9 @@ app.use("/api", appRoutes)    // Mount new business routes
 
 AppDataSource.initialize().then(async () => {
     console.log("Database connected")
-    app.listen(PORT, () => {
+    WebSocketService.init(server)
+    server.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`)
     })
 }).catch(error => console.log(error))
+// Trigger restart after truncation

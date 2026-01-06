@@ -2,25 +2,23 @@ import { Router } from "express"
 import { SchoolController } from "./controller/SchoolController"
 import { ClassController } from "./controller/ClassController"
 import { OrderController } from "./controller/OrderController"
-// Re-export existing logic if desired, or keep auth separate.
-// Strategy: Create a new router for business entities.
-import importRoutes from "./routes/importRoutes"
+import { PublicController } from "./controller/PublicController"
 
 const router = Router()
 
-// Business Routes
+// Admin Routes (previously business routes)
 router.get("/schools", SchoolController.getAll)
 router.get("/schools/stats", SchoolController.getStats)
 router.get("/schools/:id/export", SchoolController.exportData)
 router.get("/classes", ClassController.getBySchool)
 router.get("/orders", OrderController.search)
 
-// Mount existing split routes if we want to consolidate everything here
-// However, index.ts usually mounts them. Let's assume this file will export the main API router.
-// The user asked to "Create src/routes.ts and register new routes"
-// I will also include the import routes here as a sub-route or mixin if appropriate,
-// BUT to avoid breaking existing authRoutes which might be mounted separately in index.ts,
-// I will just export this router to be mounted at /api/data or similar, or replace the mounting logic.
-// Simpler: Just export a router with the NEW routes, and let index.ts use it.
+// Public Routes (for webClient)
+router.get("/public/school/:id", PublicController.getSchool)
+router.get("/public/students/query-by-idcard/:idCard", PublicController.getStudentByCard)
+router.post("/public/prepay", PublicController.prepay)
+router.get("/public/payment/status/:clientSn", PublicController.getPaymentStatus)
+router.post("/public/payment/callback", PublicController.paymentCallback)
+router.post("/public/payment/mock-callback", PublicController.mockCallback)
 
 export default router

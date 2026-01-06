@@ -7,6 +7,7 @@ import { Class } from "./entity/Class"
 import { Student } from "./entity/Student"
 import { Order } from "./entity/Order"
 import { OrderItem } from "./entity/OrderItem"
+import { Terminal } from "./entity/Terminal"
 import dotenv from "dotenv"
 
 dotenv.config()
@@ -19,8 +20,8 @@ export const AppDataSource = new DataSource({
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "byzy_v2",
     synchronize: false,
-    logging: true,
-    entities: [AdminUser, School, Product, Class, Student, Order, OrderItem],
+    logging: false,
+    entities: [AdminUser, School, Product, Class, Student, Order, OrderItem, Terminal],
     migrations: [],
     subscribers: [],
 })
