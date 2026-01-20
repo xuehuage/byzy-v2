@@ -57,3 +57,7 @@ export const updateOrder = (data: OrderUIItem) => {
 export const createSupplementaryOrder = (data: { idCard: string, summerQty: number, springQty: number, winterQty: number }) => {
     return request.post<ApiResponse<any>>('/orders/supplementary', data)
 }
+
+export const deleteOrder = (id: number) => {
+    return request.delete<ApiResponse<any>>(`/orders/${id}`)
+}

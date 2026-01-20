@@ -14,6 +14,7 @@ router.get("/classes", ClassController.getBySchool)
 router.get("/orders", OrderController.search)
 router.post("/orders/supplementary", OrderController.createSupplementary)
 router.put("/orders/:id", OrderController.update)
+router.delete("/orders/:id", OrderController.delete)
 
 // Public Routes (for webClient)
 router.get("/public/school/:id", PublicController.getSchool)

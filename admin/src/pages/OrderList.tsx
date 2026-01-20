@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Form, Select, Button, Table, Tag, Space, Typography, Input, Modal, InputNumber, message } from 'antd'
+import { Card, Form, Select, Button, Table, Tag, Space, Typography, Input, Modal, InputNumber, message, Popconfirm } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { SearchOutlined, ReloadOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
-import { getSchoolList, getOrderList, updateOrder, createSupplementaryOrder } from '../services/api'
+import { SearchOutlined, ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { getSchoolList, getOrderList, updateOrder, createSupplementaryOrder, deleteOrder } from '../services/api'
 import type { School, OrderUIItem } from '../types'
 
 const { Option } = Select
@@ -180,6 +180,18 @@ const OrderList: React.FC = () => {
         }
     }
 
+    const handleDelete = async (id: number) => {
+        try {
+            const res = await deleteOrder(id)
+            if (res.data.code === 200) {
+                message.success('删除成功')
+                fetchOrders()
+            }
+        } catch (error) {
+            console.error("Delete failed", error)
+        }
+    }
+
     // Add this to handle pagination changes after search
     useEffect(() => {
         // If we have data or have interacted, fetch on page change
@@ -262,6 +274,20 @@ const OrderList: React.FC = () => {
                     </Button> : <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
                         修改
                     </Button>}
+
+                    {record.status === 'PENDING' && (
+                        <Popconfirm
+                            title="确定要删除这条待支付订单吗？"
+                            onConfirm={() => handleDelete(record.id)}
+                            okText="确定"
+                            cancelText="取消"
+                            okButtonProps={{ danger: true }}
+                        >
+                            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                                删除
+                            </Button>
+                        </Popconfirm>
+                    )}
                 </Space>
             ),
         },

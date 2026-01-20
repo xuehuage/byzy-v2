@@ -163,7 +163,8 @@ export class OrderController {
 
                 order.items = orderItems
                 order.totalAmount = totalAmount
-                return await transactionalEntityManager.save(order)
+                const savedOrder = await transactionalEntityManager.save(order)
+                return { id: savedOrder.id, orderNo: savedOrder.orderNo }
             })
 
             return res.json({ code: 200, message: "Order created successfully", data: result })
@@ -330,9 +331,34 @@ export class OrderController {
             })
 
             return res.json({ code: 200, message: "Update success" })
-
         } catch (error: any) {
             console.error("Update order error:", error)
+            return res.status(500).json({ code: 500, message: error.message || "Internal server error" })
+        }
+    }
+
+    static async delete(req: Request, res: Response) {
+        try {
+            const id = parseInt(req.params.id)
+            await AppDataSource.manager.transaction(async (transactionalEntityManager) => {
+                const order = await transactionalEntityManager.findOne(Order, {
+                    where: { id },
+                    relations: ["items"]
+                })
+
+                if (!order) throw new Error("订单不存在")
+                if (order.status === OrderStatus.PAID) throw new Error("已支付订单不可删除")
+
+                // Remove items first (due to constraint, aunque cascade should handle it depends on config)
+                // In our current setup, we manually manage or use cascade. 
+                // Since we added cascade: true to items, it should work, but being safe:
+                await transactionalEntityManager.remove(order.items)
+                await transactionalEntityManager.remove(order)
+            })
+
+            return res.json({ code: 200, message: "删除成功" })
+        } catch (error: any) {
+            console.error("Delete order error:", error)
             return res.status(500).json({ code: 500, message: error.message || "Internal server error" })
         }
     }
