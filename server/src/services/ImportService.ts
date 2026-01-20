@@ -46,8 +46,25 @@ export class ImportService {
 
             // 3. 处理学生和订单 (Process Students & Orders)
             const classCache = new Map<string, Class>()
+            const skippedStudents: any[] = []
+            let importedCount = 0
 
             for (const studentData of students) {
+                // Check if student already has orders for this school
+                const existingStudent = await transactionalEntityManager.findOne(Student, {
+                    where: { idCard: studentData.idCard },
+                    relations: ["orders"]
+                })
+
+                if (existingStudent && existingStudent.orders.length > 0) {
+                    skippedStudents.push({
+                        studentName: studentData.studentName,
+                        idCard: studentData.idCard,
+                        reason: "已存在相关订单"
+                    })
+                    continue
+                }
+
                 // 处理班级 (Handle Class)
                 let classEntity: Class | undefined | null = classCache.get(studentData.className)
                 if (!classEntity) {
@@ -64,9 +81,9 @@ export class ImportService {
                 }
 
                 // 处理学生 (Handle Student)
-                let student = await transactionalEntityManager.findOne(Student, { where: { idCard: studentData.idCard } })
+                let student = existingStudent
                 if (student) {
-                    // 更新现有学生 (Update existing)
+                    // 更新现有学生 (Update existing) - should have classId updated if changed in excel
                     student.name = studentData.studentName
                     student.classId = classEntity.id
                 } else {
@@ -113,20 +130,27 @@ export class ImportService {
                     // 创建订单项 (Create Order Items)
                     const orderItems = items.map(item => {
                         const orderItem = new OrderItem()
-                        orderItem.orderId = savedOrder.id
+                        orderItem.order = savedOrder
                         const product = productMap.get(item.type)
                         if (product) {
-                            orderItem.productId = product.id
+                            orderItem.product = product
                         }
                         orderItem.quantity = item.qty
                         orderItem.priceSnapshot = item.price
                         return orderItem
                     })
                     await transactionalEntityManager.save(orderItems)
+                    importedCount++
                 }
             }
 
-            return { success: true, schoolId: school.id, studentCount: students.length }
+            return {
+                success: true,
+                schoolId: school.id,
+                importedCount,
+                skippedCount: skippedStudents.length,
+                skippedStudents
+            }
         })
     }
 }

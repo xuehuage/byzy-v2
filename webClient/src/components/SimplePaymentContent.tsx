@@ -172,53 +172,75 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
         console.log('🏁 开始初始化支付组件');
 
         const init = async () => {
-            const storedOrder = checkStoredOrder();
-            if (storedOrder) {
-                // 从缓存恢复
-                setPrepayData(storedOrder.prepayData);
+            setLoading(true);
+            setError('');
 
-                // 使用实时计算而不是固定的剩余时间
-                const initialRemainingSeconds = calculateRemainingSeconds();
-                setRemainingSeconds(initialRemainingSeconds);
+            try {
+                // 1. MUST fetch fresh student detail first to get latest unpaid orders
+                const studentId = paymentParamsRef.current.studentIdNumber;
+                if (!studentId) throw new Error('未提供学生身份证号');
 
-                // 如果已经过期，立即设置过期状态并清理
-                if (initialRemainingSeconds <= 0) {
-                    setIsExpired(true);
-                    localStorage.removeItem('paymentOrder');
-                    console.log('⏰ 初始化时发现订单已过期，立即清理');
-                    cleanup(); // 🔥 确保过期订单立即清理
-                } else {
-                    // 获取学生信息
-                    try {
-                        const studentDetail = await fetchStudentDetail(paymentParamsRef.current.studentIdNumber);
-                        if (componentMountedRef.current) {
-                            setStudentInfo(studentDetail.data.student);
+                const studentDetailRes = await fetchStudentDetail(studentId);
+                if (!componentMountedRef.current) return;
+
+                const freshStudent = studentDetailRes.data.student;
+                const freshOrders = studentDetailRes.data.orders || [];
+                setStudentInfo(freshStudent);
+
+                // Calculate current total for unpaid items (in Yuan)
+                const currentUnpaidTotalYuan = freshOrders
+                    .filter((o: any) => o.payment_status === 0)
+                    .reduce((sum: number, o: any) => sum + (Number(o.total_amount) / 100), 0);
+
+                // 2. Check localStorage
+                const storedOrder = checkStoredOrder();
+
+                if (storedOrder) {
+                    const cachedAmount = Number(storedOrder.prepayData.total_amount);
+
+                    // 3. VALIDATE: Restore cache ONLY if amount matches and not expired
+                    // Using a small epsilon for float comparison just in case
+                    if (Math.abs(cachedAmount - currentUnpaidTotalYuan) < 0.01) {
+                        console.log('✅ 缓存金额匹配，恢复之前的支付状态');
+                        setPrepayData(storedOrder.prepayData);
+
+                        const initialRemainingSeconds = calculateRemainingSeconds();
+                        setRemainingSeconds(initialRemainingSeconds);
+
+                        if (initialRemainingSeconds <= 0) {
+                            setIsExpired(true);
+                            localStorage.removeItem('paymentOrder');
+                            cleanup();
+                        } else {
+                            initializePaymentStatus({
+                                clientSn: storedOrder.client_sn,
+                                onPaymentSuccess: handlePaymentSuccess
+                            });
                         }
-                    } catch (err) {
-                        console.error('获取学生信息失败:', err);
+                        setLoading(false);
+                        return; // Found valid cache, stop here
+                    } else {
+                        console.log('🔄 订单金额由于管理员修改已变动，忽略旧缓存，生成新预支付信息');
+                        console.log(`Cached: ${cachedAmount}, Actual: ${currentUnpaidTotalYuan}`);
+                        localStorage.removeItem('paymentOrder');
                     }
-
-                    // 🔥 只有未过期的订单才初始化支付状态监听
-                    console.log('🔄 从缓存初始化支付状态监听');
-                    initializePaymentStatus({
-                        clientSn: storedOrder.client_sn,
-                        onPaymentSuccess: handlePaymentSuccess
-                    });
                 }
 
+                // 4. No valid cache found or amount mismatch, create NEW prepay
+                await getPrepayInfo();
+
+                // 检查是否已支付 (Check if paid locally recently)
+                const paidTime = localStorage.getItem(`paid_${studentId}`);
+                if (paidTime && (Date.now() - parseInt(paidTime) < 5 * 60 * 1000)) {
+                    setOrderStatus('PAID');
+                }
+            } catch (err) {
+                if (!componentMountedRef.current) return;
+                setError(err instanceof Error ? err.message : String(err));
+            } finally {
                 if (componentMountedRef.current) {
                     setLoading(false);
                 }
-            } else {
-                // 创建新订单
-                await getPrepayInfo();
-            }
-
-            // 检查是否已支付
-            const paidTime = localStorage.getItem(`paid_${paymentParamsRef.current.studentIdNumber}`);
-            if (paidTime && (Date.now() - parseInt(paidTime) < 5 * 60 * 1000)) {
-                setOrderStatus('PAID');
-                setLoading(false);
             }
         };
 

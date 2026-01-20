@@ -12,6 +12,8 @@ router.get("/schools/stats", SchoolController.getStats)
 router.get("/schools/:id/export", SchoolController.exportData)
 router.get("/classes", ClassController.getBySchool)
 router.get("/orders", OrderController.search)
+router.post("/orders/supplementary", OrderController.createSupplementary)
+router.put("/orders/:id", OrderController.update)
 
 // Public Routes (for webClient)
 router.get("/public/school/:id", PublicController.getSchool)

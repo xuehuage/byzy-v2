@@ -5,7 +5,8 @@ import type {
     SchoolStats,
     ClassEntity,
     OrderListResponse,
-    OrderSearchParams
+    OrderSearchParams,
+    OrderUIItem
 } from '../types'
 
 // --- API Methods ---
@@ -47,4 +48,12 @@ export const getOrderList = (params: OrderSearchParams) => {
     return request.get<ApiResponse<OrderListResponse>>('/orders', {
         params
     })
+}
+
+export const updateOrder = (data: OrderUIItem) => {
+    return request.put<ApiResponse<any>>(`/orders/${data.id}`, data)
+}
+
+export const createSupplementaryOrder = (data: { idCard: string, summerQty: number, springQty: number, winterQty: number }) => {
+    return request.post<ApiResponse<any>>('/orders/supplementary', data)
 }

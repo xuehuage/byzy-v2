@@ -86,3 +86,11 @@ export interface OrderListResponse {
     page: number
     pageSize: number
 }
+
+export interface OrderUIItem extends Order {
+    className: string
+    studentName: string
+    summerQty: number
+    springQty: number
+    winterQty: number
+}

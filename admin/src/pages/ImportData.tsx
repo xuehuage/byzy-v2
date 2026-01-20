@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Card, Form, Input, InputNumber, Button, message, Typography, Row, Col } from 'antd'
+import { Card, Form, Input, InputNumber, Button, message, Typography, Row, Col, Modal } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import ExcelUploader from '../components/ExcelUploader'
@@ -41,15 +41,39 @@ const ImportData: React.FC = () => {
 
             const res = await importSchoolData(payload)
             if (res && res.data && res.data.code === 200) {
-                message.success('Data imported successfully!')
-                navigate('/schools')
+                const { importedCount, skippedCount, skippedStudents } = res.data.data
+
+                Modal.success({
+                    title: '导入完成',
+                    width: 600,
+                    content: (
+                        <div>
+                            <p>成功导入：<b>{importedCount}</b> 位学生</p>
+                            <p>跳过导入：<b>{skippedCount}</b> 位学生（系统已存在其订单）</p>
+
+                            {skippedCount > 0 && (
+                                <div className="mt-4">
+                                    <p className="font-bold text-red-500 mb-2">以下学生已存在订单，如需增订请前往“订单管理”手动修改：</p>
+                                    <div className="max-h-60 overflow-y-auto border rounded p-2 bg-gray-50">
+                                        <ul className="list-disc pl-5">
+                                            {skippedStudents.map((s: any, idx: number) => (
+                                                <li key={idx}>
+                                                    {s.studentName} ({s.idCard})
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ),
+                    onOk: () => navigate('/schools')
+                })
             } else {
                 message.error(res?.data?.message || 'Import failed')
             }
         } catch (error) {
             console.error('Import Error:', error)
-            // Error handling for validation or API
-            // message.error('Failed to import data') // Optional: axios interceptor might handle this
         } finally {
             setLoading(false)
         }
