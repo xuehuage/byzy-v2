@@ -23,7 +23,7 @@ function downloadCSV(rows: any[], filename: string) {
     if (!rows.length) { message.warning('暂无数据可导出'); return; }
     const headers = Object.keys(rows[0]);
     const headerLabels: Record<string, string> = {
-        orderNo: '订单号', studentName: '学生姓名', className: '班级',
+        orderNo: '订单号', studentName: '学生姓名', gradeName: '年级', className: '班级',
         birthday: '生日', productType: '商品类型',
         size: '尺码', isSpecialSize: '特殊身材', height: '身高(cm)',
         weight: '体重(斤)', quantity: '套数', totalAmount: '支付金额(元)',
@@ -128,7 +128,7 @@ const ShippingMgmt: React.FC = () => {
             key: 'pendingOrderCount',
             render: (count) => (
                 <Tag color="blue" style={{ fontSize: 14, padding: '2px 10px', fontWeight: 700 }}>
-                    {count} 份
+                    {count} 单
                 </Tag>
             )
         },
@@ -166,7 +166,6 @@ const ShippingMgmt: React.FC = () => {
         }
     ];
 
-    const totalOrders = data.reduce((s, r) => s + r.pendingOrderCount, 0);
 
     return (
         <div className="p-6 bg-white shadow-sm rounded-lg min-h-full">
@@ -206,12 +205,7 @@ const ShippingMgmt: React.FC = () => {
                 </Button>
             </div>
 
-            {/* Summary Banner */}
-            {totalOrders > 0 && (
-                <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-blue-700 text-sm font-medium">
-                    共 <strong>{data.length}</strong> 所学校，待发货订单合计 <strong>{totalOrders}</strong> 份
-                </div>
-            )}
+
 
             <Table
                 columns={columns}

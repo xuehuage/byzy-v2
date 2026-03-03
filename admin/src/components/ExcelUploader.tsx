@@ -43,7 +43,7 @@ const ExcelUploader: React.FC<ExcelUploaderProps> = ({ onFinish, preview = false
                         studentName: String(rowVal[2] || ''),
                         idCard: String(rowVal[3] || ''),
                         summerQty: Number(rowVal[4] || 0),
-                        springQty: Number(rowVal[5] || 0),
+                        autumnQty: Number(rowVal[5] || 0),
                         winterQty: Number(rowVal[6] || 0)
                     })
                 }
@@ -94,7 +94,7 @@ const ExcelUploader: React.FC<ExcelUploaderProps> = ({ onFinish, preview = false
         { title: '学生姓名', dataIndex: 'studentName', key: 'studentName' },
         { title: '身份证号', dataIndex: 'idCard', key: 'idCard' },
         { title: '夏装数量', dataIndex: 'summerQty', key: 'summerQty' },
-        { title: '春秋装数量', dataIndex: 'springQty', key: 'springQty' },
+        { title: '秋装数量', dataIndex: 'autumnQty', key: 'autumnQty' },
         { title: '冬装数量', dataIndex: 'winterQty', key: 'winterQty' },
     ]
 
@@ -106,7 +106,7 @@ const ExcelUploader: React.FC<ExcelUploaderProps> = ({ onFinish, preview = false
                 </p>
                 <p className="ant-upload-text">点击或拖拽Excel文件到此区域解析</p>
                 <p className="ant-upload-hint">
-                    支持单个Excel文件(.xlsx)。表格顺序：班级 | 学生姓名 | 身份证号 | 夏装数量 | 春秋装数量 | 冬装数量
+                    支持单个Excel文件(.xlsx)。表格顺序：班级 | 学生姓名 | 身份证号 | 夏装数量 | 秋装数量 | 冬装数量
                 </p>
             </Dragger>
 

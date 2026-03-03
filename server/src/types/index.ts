@@ -4,11 +4,14 @@ export interface ProductInput {
 }
 
 export interface StudentInput {
+    gradeName: string
     className: string
     studentName: string
+    phone: string
+    birthday: string
     idCard: string
     summerQty: number
-    springQty: number
+    autumnQty: number
     winterQty: number
 }
 

@@ -14,7 +14,10 @@ export class PublicController {
     static async getSchool(req: Request, res: Response) {
         try {
             const id = parseInt(req.params.id)
-            const school = await AppDataSource.getRepository(School).findOneBy({ id })
+            const school = await AppDataSource.getRepository(School).findOne({
+                where: { id },
+                relations: ["grades", "grades.classes"]
+            })
             if (!school) return res.status(404).json({ code: 404, message: "School not found" })
             return res.json({ code: 200, data: school })
         } catch (error) {
@@ -22,41 +25,55 @@ export class PublicController {
         }
     }
 
+    private static formatStudentOrders(student: Student) {
+        if (!student.orders) return [];
+        return student.orders.map(order => {
+            const items = (order.items || []).map(item => {
+                let uType = 1;
+                if (item.product?.type === 0) uType = 1;      // 夏装
+                else if (item.product?.type === 1) uType = 2; // 春秋装
+                else if (item.product?.type === 2) uType = 3; // 冬装
+
+                return {
+                    id: item.id,
+                    size: item.size || "以实际发放为准",
+                    quantity: item.quantity,
+                    price: (item.priceSnapshot || 0).toString(),
+                    uniform_type: uType,
+                    product_name: item.product?.name || (uType === 1 ? "夏季校服" : (uType === 2 ? "春秋校服" : "冬季校服"))
+                }
+            })
+
+            return {
+                order_id: order.id,
+                order_no: order.orderNo,
+                total_amount: (order.totalAmount || 0).toString(),
+                // Robust payment_status mapping: anyone in a paid-related state is 'Paid' (1)
+                payment_status: [
+                    OrderStatus.PAID,
+                    OrderStatus.EXCHANGING,
+                    OrderStatus.SHIPPED,
+                    OrderStatus.REFUNDING,
+                    OrderStatus.REFUNDED
+                ].includes(order.status) ? 1 : 0,
+                order_status: order.status,
+                created_at: order.createdAt,
+                updated_at: order.updatedAt,
+                items: items
+            }
+        })
+    }
+
     static async getStudentByCard(req: Request, res: Response) {
         try {
             const { idCard } = req.params
             const student = await AppDataSource.getRepository(Student).findOne({
                 where: { idCard },
-                relations: ["class", "orders", "orders.items", "orders.items.product"]
+                relations: ["grade", "class", "orders", "orders.items", "orders.items.product"]
             })
 
             if (!student) return res.status(404).json({ code: 404, message: "未找到该学生信息" })
 
-            const items: any[] = []
-            student.orders.forEach(order => {
-                order.items.forEach(item => {
-                    let uType = 1;
-                    if (item.product.type === 0) uType = 1;      // 夏装
-                    else if (item.product.type === 1) uType = 2; // 春秋装
-                    else if (item.product.type === 2) uType = 3; // 冬装
-
-                    items.push({
-                        id: item.id,
-                        student_id: student.id,
-                        size: item.size || "以实际发放为准",
-                        quantity: item.quantity,
-                        total_amount: (Number(item.priceSnapshot) * item.quantity).toString(),
-                        order_type: 1,
-                        payment_status: order.status === OrderStatus.PAID ? 1 : 0,
-                        uniform_type: uType,
-                        price: item.priceSnapshot.toString(),
-                        created_at: order.createdAt,
-                        updated_at: order.updatedAt
-                    })
-                })
-            })
-
-            // Omit raw orders from student object to avoid cent/Yuan confusion in client
             const { orders: rawOrders, ...studentInfo } = student as any
 
             return res.json({
@@ -64,9 +81,10 @@ export class PublicController {
                 data: {
                     student: {
                         ...studentInfo,
+                        grade_name: student.grade?.name || "未知年级",
                         class_name: student.class?.name || "未分班",
                     },
-                    orders: items
+                    orders: PublicController.formatStudentOrders(student)
                 }
             })
         } catch (error) {
@@ -85,32 +103,10 @@ export class PublicController {
 
             const student = await AppDataSource.getRepository(Student).findOne({
                 where: whereClause,
-                relations: ["class", "orders", "orders.items", "orders.items.product"]
+                relations: ["grade", "class", "orders", "orders.items", "orders.items.product"]
             })
 
             if (!student) return res.status(404).json({ code: 404, message: "未找到该学生信息" })
-
-            const items: any[] = []
-            student.orders.forEach(order => {
-                order.items.forEach(item => {
-                    let uniformType = 1
-                    if (item.product.type === 0) uniformType = 1
-                    else if (item.product.type === 1) uniformType = 2
-                    else if (item.product.type === 2) uniformType = 3
-
-                    items.push({
-                        id: order.id,
-                        order_no: order.orderNo,
-                        uniform_type: uniformType,
-                        size: item.size || "未填",
-                        quantity: item.quantity,
-                        price: item.priceSnapshot,
-                        total_amount: order.totalAmount,
-                        payment_status: [OrderStatus.PAID, OrderStatus.EXCHANGING, OrderStatus.SHIPPED, OrderStatus.REFUNDING, OrderStatus.REFUNDED].includes(order.status) ? 1 : 0,
-                        order_status: order.status
-                    })
-                })
-            })
 
             const { orders: rawOrders, ...studentInfo } = student as any
 
@@ -119,9 +115,10 @@ export class PublicController {
                 data: {
                     student: {
                         ...studentInfo,
+                        grade_name: student.grade?.name || "未知年级",
                         class_name: student.class?.name || "未分班",
                     },
-                    orders: items
+                    orders: PublicController.formatStudentOrders(student)
                 }
             })
         } catch (error) {
@@ -137,42 +134,20 @@ export class PublicController {
                 return res.status(400).json({ code: 400, message: "参数不完整" })
             }
 
-            const student = await AppDataSource.getRepository(Student).findOne({
-                where: {
-                    name: name as string,
-                    phone: phone as string,
-                    birthday: birthday as string,
-                    schoolId: Number(schoolId)
-                },
-                relations: ["class", "orders", "orders.items", "orders.items.product"]
-            })
+            const studentRepository = AppDataSource.getRepository(Student)
+            const student = await studentRepository.createQueryBuilder("student")
+                .leftJoinAndSelect("student.grade", "grade")
+                .leftJoinAndSelect("student.class", "class")
+                .leftJoinAndSelect("student.orders", "order")
+                .leftJoinAndSelect("order.items", "item")
+                .leftJoinAndSelect("item.product", "product")
+                .where("student.name = :name", { name })
+                .andWhere("student.phone = :phone", { phone })
+                .andWhere("student.birthday = :birthday", { birthday })
+                .andWhere("grade.school_id = :schoolId", { schoolId: Number(schoolId) })
+                .getOne()
 
             if (!student) return res.status(404).json({ code: 404, message: "未找到该学生信息" })
-
-            const items: any[] = []
-            student.orders.forEach(order => {
-                order.items.forEach(item => {
-                    let uType = 1;
-                    if (item.product.type === 0) uType = 1;
-                    else if (item.product.type === 1) uType = 2;
-                    else if (item.product.type === 2) uType = 3;
-
-                    items.push({
-                        id: item.id,
-                        student_id: student.id,
-                        size: item.size || "以实际发放为准",
-                        quantity: item.quantity,
-                        total_amount: (Number(item.priceSnapshot) * item.quantity).toString(),
-                        order_type: 1,
-                        payment_status: [OrderStatus.PAID, OrderStatus.EXCHANGING, OrderStatus.SHIPPED, OrderStatus.REFUNDING, OrderStatus.REFUNDED].includes(order.status) ? 1 : 0,
-                        order_status: order.status,
-                        uniform_type: uType,
-                        price: item.priceSnapshot.toString(),
-                        created_at: order.createdAt,
-                        updated_at: order.updatedAt
-                    })
-                })
-            })
 
             const { orders: rawOrders, ...studentInfo } = student as any
 
@@ -181,9 +156,10 @@ export class PublicController {
                 data: {
                     student: {
                         ...studentInfo,
+                        grade_name: student.grade?.name || "未知年级",
                         class_name: student.class?.name || "未分班",
                     },
-                    orders: items
+                    orders: PublicController.formatStudentOrders(student)
                 }
             })
         } catch (error) {
@@ -199,56 +175,34 @@ export class PublicController {
                 return res.status(400).json({ code: 400, message: "请提供手机号" })
             }
 
-            const whereClause: any = { phone: phone as string }
-            if (schoolId) whereClause.schoolId = Number(schoolId)
+            const studentRepository = AppDataSource.getRepository(Student)
+            const query = studentRepository.createQueryBuilder("student")
+                .leftJoinAndSelect("student.grade", "grade")
+                .leftJoinAndSelect("student.class", "class")
+                .leftJoinAndSelect("student.orders", "order")
+                .leftJoinAndSelect("order.items", "item")
+                .leftJoinAndSelect("item.product", "product")
+                .where("student.phone = :phone", { phone: phone as string })
 
-            const students = await AppDataSource.getRepository(Student).find({
-                where: whereClause,
-                relations: ["class", "orders", "orders.items", "orders.items.product"]
-            })
+            if (schoolId) {
+                query.andWhere("grade.school_id = :schoolId", { schoolId: Number(schoolId) })
+            }
+
+            const students = await query.getMany()
 
             if (!students || students.length === 0) {
                 return res.status(404).json({ code: 404, message: "未找到该手机号对应的购买信息" })
             }
 
             const result = students.map(student => {
-                const mappedOrders = student.orders.map(order => {
-                    const items = order.items.map(item => {
-                        let uniformType = 1
-                        if (item.product?.type === 0) uniformType = 1
-                        else if (item.product?.type === 1) uniformType = 2
-                        else if (item.product?.type === 2) uniformType = 3
-
-                        return {
-                            id: item.id,
-                            size: item.size || "以实际发放为准",
-                            quantity: item.quantity,
-                            price: item.priceSnapshot.toString(),
-                            uniform_type: uniformType,
-                            product_name: item.product?.name || (uniformType === 1 ? "夏季校服" : (uniformType === 2 ? "春秋校服" : "冬季校服"))
-                        }
-                    })
-
-                    return {
-                        order_id: order.id,
-                        order_no: order.orderNo,
-                        total_amount: order.totalAmount.toString(),
-                        payment_status: order.status === OrderStatus.PAID ? 1 : 0,
-                        status: order.status,
-                        created_at: order.createdAt,
-                        updated_at: order.updatedAt,
-                        items: items
-                    }
-                })
-
                 const { orders: rawOrders, ...studentInfo } = student as any
                 return {
                     student: {
                         ...studentInfo,
+                        grade_name: student.grade?.name || "未知年级",
                         class_name: student.class?.name || "未分班",
-                        grade_name: "",
                     },
-                    orders: mappedOrders
+                    orders: PublicController.formatStudentOrders(student)
                 }
             })
 
@@ -272,7 +226,8 @@ export class PublicController {
                     student: {
                         name: orderTemp.studentName,
                         phone: orderTemp.studentPhone,
-                        birthday: orderTemp.studentBirthday
+                        birthday: orderTemp.studentBirthday,
+                        gradeId: orderTemp.gradeId
                     },
                     orders: items.map((item: any) => ({
                         ...item,
@@ -292,7 +247,7 @@ export class PublicController {
 
     static async createOrderV2(req: Request, res: Response) {
         try {
-            const { schoolId, name, phone, birthday, items } = req.body
+            const { schoolId, gradeId, classId, name, phone, birthday, items } = req.body
             if (!schoolId || !name || !phone || !birthday || !items || !items.length) {
                 return res.status(400).json({ code: 400, message: "参数不完整" })
             }
@@ -314,12 +269,18 @@ export class PublicController {
                 else if (itemData.uniformType === 3) pType = 2
 
                 let product = await productRepo.findOneBy({ schoolId: Number(schoolId), type: pType })
+                const currentPrice = pType === 0 ? school.summerPrice : (pType === 1 ? school.autumnPrice : school.winterPrice)
+
                 if (!product) {
                     product = new Product()
                     product.schoolId = Number(schoolId)
                     product.type = pType
                     product.name = pType === 0 ? "夏季校服" : (pType === 1 ? "春秋校服" : "冬季校服")
-                    product.price = pType === 0 ? school.summerPrice : (pType === 1 ? school.autumnPrice : school.winterPrice)
+                    product.price = currentPrice
+                    await productRepo.save(product)
+                } else if (product.price !== currentPrice) {
+                    // 同步更新产品表中的价格
+                    product.price = currentPrice
                     await productRepo.save(product)
                 }
 
@@ -341,6 +302,8 @@ export class PublicController {
             const orderTemp = orderTempRepo.create({
                 clientSn,
                 schoolId: Number(schoolId),
+                gradeId: Number(gradeId),
+                classId: classId ? Number(classId) : null,
                 studentName: name,
                 studentPhone: phone,
                 studentBirthday: birthday,
@@ -454,7 +417,8 @@ export class PublicController {
                 name: orderTemp.studentName,
                 phone: orderTemp.studentPhone,
                 birthday: orderTemp.studentBirthday,
-                schoolId: orderTemp.schoolId
+                gradeId: orderTemp.gradeId ?? undefined,
+                classId: orderTemp.classId ?? undefined
             })
 
             if (!student) {
@@ -462,7 +426,8 @@ export class PublicController {
                     name: orderTemp.studentName,
                     phone: orderTemp.studentPhone,
                     birthday: orderTemp.studentBirthday,
-                    schoolId: orderTemp.schoolId
+                    gradeId: orderTemp.gradeId,
+                    classId: orderTemp.classId
                 })
                 await manager.save(student)
             }

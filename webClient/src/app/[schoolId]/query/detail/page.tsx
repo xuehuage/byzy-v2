@@ -3,13 +3,18 @@
 import { useState, use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeftOutlined, SwapOutlined, UndoOutlined } from '@ant-design/icons';
-import { Typography, Tag, Card, Button, Empty, message, Modal, Input, InputNumber, Divider } from 'antd';
+import { Typography, Tag, Card, Button, Empty, message, Modal, Input, InputNumber } from 'antd';
+import { Picker, Divider } from 'antd-mobile';
 import Footer from '@/components/Footer';
 import axiosInstance from 'src/utils/axiosInstance';
 
 const { Title, Text } = Typography;
 
 const uniformTypeText: Record<number, string> = { 1: '夏季校服', 2: '春秋校服', 3: '冬季校服' };
+
+const SIZES_OPTIONS = [
+    ['145#', '150#', '155#', '160#', '165#', '170#', '175#', '180#', '185#', '190#', '195#'].map(s => ({ label: s, value: s }))
+];
 
 function formatAmount(val: any) {
     const num = Number(val);
@@ -24,8 +29,17 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
     const [actionLoading, setActionLoading] = useState(false);
 
     // Exchange modal state
-    const [exchangeModal, setExchangeModal] = useState<{ open: boolean; orderId: number; currentSize: string; maxQty: number } | null>(null);
-    const [newSize, setNewSize] = useState('');
+    const [exchangeModal, setExchangeModal] = useState<{
+        open: boolean;
+        orderId: number;
+        currentSize: string;
+        maxQty: number;
+        newSize: string;
+        isSpecialSize: boolean;
+        height?: string;
+        weight?: string;
+    } | null>(null);
+    const [pickerVisible, setPickerVisible] = useState(false);
 
     // Refund modal state
     const [refundModal, setRefundModal] = useState<{ open: boolean; orderId: number; maxQty: number; orderName: string } | null>(null);
@@ -40,16 +54,26 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
         setStudentData((prev: any) => ({
             ...prev,
             orders: prev.orders.map((o: any) =>
-                o.order_id === orderId ? { ...o, order_status: orderStatus } : o
+                o.order_id === orderId ? {
+                    ...o,
+                    order_status: orderStatus,
+                    // If moving to an after-sales state, it must have been paid
+                    payment_status: 1
+                } : o
             )
         }));
     };
 
     const handleExchangeSubmit = async () => {
-        if (!newSize.trim()) {
-            message.warning('请填写希望换成的尺码');
+        if (!exchangeModal?.isSpecialSize && !exchangeModal?.newSize) {
+            message.warning('请选择希望换成的尺码');
             return;
         }
+        if (exchangeModal?.isSpecialSize && (!exchangeModal.height || !exchangeModal.weight)) {
+            message.warning('请填写身高和体重信息');
+            return;
+        }
+
         setActionLoading(true);
         try {
             const order = studentData.orders.find((o: any) => o.order_id === exchangeModal?.orderId);
@@ -58,13 +82,16 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                 order_id: exchangeModal?.orderId,
                 type: 'EXCHANGE',
                 original_size: primaryItem?.size || '',
-                new_size: newSize,
+                new_size: exchangeModal?.isSpecialSize ? `特殊:${exchangeModal.height}cm/${exchangeModal.weight}斤` : exchangeModal?.newSize,
+                is_special_size: exchangeModal?.isSpecialSize,
+                height: exchangeModal?.height,
+                weight: exchangeModal?.weight,
                 original_quantity: primaryItem?.quantity ?? 1,
                 new_quantity: primaryItem?.quantity ?? 1,
             });
             message.success('调换申请已提交，请等待管理员处理');
             setExchangeModal(null);
-            if (exchangeModal?.orderId) updateOrderStatus(exchangeModal.orderId, 'EXCHANGE_PENDING');
+            if (exchangeModal?.orderId) updateOrderStatus(exchangeModal.orderId, 'EXCHANGING');
         } catch (err: any) {
             message.error(err.message || '提交失败');
         } finally {
@@ -86,7 +113,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
             });
             message.success('退款申请已提交，请等待管理员处理');
             setRefundModal(null);
-            if (refundModal?.orderId) updateOrderStatus(refundModal.orderId, 'REFUND_PENDING');
+            if (refundModal?.orderId) updateOrderStatus(refundModal.orderId, 'REFUNDING');
         } catch (err: any) {
             message.error(err.message || '提交失败');
         } finally {
@@ -131,9 +158,9 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                             <div className="text-white font-bold text-base">{student.phone || '—'}</div>
                         </div>
                         <div>
-                            <div className="text-white/50 text-xs mb-0.5">班级</div>
+                            <div className="text-white/50 text-xs mb-0.5">年级/班级</div>
                             <div className="text-white font-bold text-base">
-                                {student.class_name && student.class_name !== '未分班' ? student.class_name : '—'}
+                                {student.grade_name || ''} {student.class_name && student.class_name !== '未分班' ? student.class_name : (student.grade_name ? '' : '—')}
                             </div>
                         </div>
                         <div>
@@ -225,13 +252,14 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                     icon={<SwapOutlined />}
                                                     className="rounded-2xl h-12 font-bold text-sm text-blue-600 bg-blue-50 border-none hover:bg-blue-100 transition-all"
                                                     onClick={() => {
-                                                        setNewSize('');
                                                         const primaryItem = order.items?.[0] || order;
                                                         setExchangeModal({
                                                             open: true,
                                                             orderId: order.order_id || order.id,
                                                             currentSize: primaryItem?.size,
-                                                            maxQty: primaryItem?.quantity
+                                                            maxQty: primaryItem?.quantity,
+                                                            newSize: '160#',
+                                                            isSpecialSize: false
                                                         });
                                                     }}
                                                 >
@@ -284,30 +312,106 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
 
             {/* Exchange Modal */}
             <Modal
-                title="申请调换尺码"
+                title={<span className="font-bold">申请调换尺码</span>}
                 open={!!exchangeModal?.open}
                 onOk={handleExchangeSubmit}
                 onCancel={() => setExchangeModal(null)}
                 confirmLoading={actionLoading}
                 okText="提交申请"
                 cancelText="取消"
+                className="premium-modal"
+                bodyStyle={{ padding: '12px 24px 24px' }}
             >
-                <div className="py-4 space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <Text type="secondary" className="text-sm">当前尺码</Text>
-                        <Text strong className="text-base">{exchangeModal?.currentSize || '未知'}</Text>
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div className="flex flex-col">
+                            <Text type="secondary" className="text-[10px] font-bold uppercase tracking-wider mb-0.5">当前在用尺码</Text>
+                            <Text className="text-gray-800 font-black text-lg">{exchangeModal?.currentSize || '未知'}</Text>
+                        </div>
+                        <SwapOutlined className="text-gray-300 text-xl" />
+                        <div className="flex flex-col text-right">
+                            <Text type="secondary" className="text-[10px] font-bold uppercase tracking-wider mb-0.5">目标换货尺码</Text>
+                            <Text className="text-blue-600 font-black text-lg">
+                                {exchangeModal?.isSpecialSize
+                                    ? (exchangeModal.height && exchangeModal.weight ? `${exchangeModal.height}cm/${exchangeModal.weight}斤` : '待填写')
+                                    : (exchangeModal?.newSize || '未选择')}
+                            </Text>
+                        </div>
                     </div>
+
                     <div>
-                        <Text type="secondary" className="text-sm block mb-2">希望换成的尺码</Text>
-                        <Input
-                            placeholder="请输入新尺码，例如 165#"
-                            value={newSize}
-                            onChange={(e) => setNewSize(e.target.value)}
-                            size="large"
-                            className="rounded-xl"
-                        />
+                        <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
+                            <button
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${!exchangeModal?.isSpecialSize ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}
+                                onClick={() => setExchangeModal(prev => prev ? { ...prev, isSpecialSize: false } : null)}
+                            >
+                                常规尺码
+                            </button>
+                            <button
+                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${exchangeModal?.isSpecialSize ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}
+                                onClick={() => setExchangeModal(prev => prev ? { ...prev, isSpecialSize: true } : null)}
+                            >
+                                特殊尺码
+                            </button>
+                        </div>
+
+                        {exchangeModal?.isSpecialSize ? (
+                            <div className="flex gap-4 animate-fadeIn">
+                                <div className="flex-1">
+                                    <Text type="secondary" style={{ fontSize: '11px' }} className="block mb-1 px-1 font-bold uppercase">身高 (cm)</Text>
+                                    <Input
+                                        type="number"
+                                        className="w-full bg-gray-50 border-none rounded-xl h-12 px-4 text-sm font-bold focus:ring-1 focus:ring-blue-400 outline-none"
+                                        placeholder="如 165"
+                                        value={exchangeModal.height || ''}
+                                        onChange={(e) => setExchangeModal(prev => prev ? { ...prev, height: e.target.value } : null)}
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <Text type="secondary" style={{ fontSize: '11px' }} className="block mb-1 px-1 font-bold uppercase">体重 (斤)</Text>
+                                    <Input
+                                        type="number"
+                                        className="w-full bg-gray-50 border-none rounded-xl h-12 px-4 text-sm font-bold focus:ring-1 focus:ring-blue-400 outline-none"
+                                        placeholder="如 110"
+                                        value={exchangeModal.weight || ''}
+                                        onChange={(e) => setExchangeModal(prev => prev ? { ...prev, weight: e.target.value } : null)}
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div
+                                className="flex items-center justify-between bg-blue-50/50 p-5 rounded-2xl border border-blue-100 active:scale-[0.98] transition-all cursor-pointer"
+                                onClick={() => setPickerVisible(true)}
+                            >
+                                <div className="flex flex-col">
+                                    <Text type="secondary" className="text-[10px] font-bold uppercase tracking-wider mb-0.5">选择标准号段</Text>
+                                    <Text className="text-blue-600 font-black text-xl">{exchangeModal?.newSize || '160#'}</Text>
+                                </div>
+                                <div className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg shadow-blue-200">
+                                    <SwapOutlined className="rotate-90" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                        <div className="text-amber-700 text-[10px] font-bold uppercase tracking-widest mb-1">温馨提示</div>
+                        <Text className="text-amber-800/70 text-xs leading-relaxed">
+                            申请提交后，请保持手机畅通。管理员将核实库存后为您处理调换。特殊尺码通常需要更长的备货时间。
+                        </Text>
                     </div>
                 </div>
+
+                <Picker
+                    columns={SIZES_OPTIONS}
+                    visible={pickerVisible}
+                    onClose={() => setPickerVisible(false)}
+                    value={[exchangeModal?.newSize || '160#']}
+                    onConfirm={v => {
+                        setExchangeModal(prev => prev ? { ...prev, newSize: v[0] as string } : null);
+                        setPickerVisible(false);
+                    }}
+                />
             </Modal>
 
             {/* Refund Modal */}

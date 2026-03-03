@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
     Tabs, Card, Button, Modal, Form, Input, Table, Space,
-    Tag, Select, Upload, Row, Col, Typography, message, Badge, Empty
+    Tag, Select, Upload, Row, Col, Typography, message, Badge, Empty, Collapse
 } from 'antd';
 import {
     BankOutlined, TeamOutlined, PlusOutlined, DownloadOutlined,
     UploadOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
-    CloseCircleOutlined, EditOutlined, InfoCircleOutlined
+    CloseCircleOutlined, EditOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
-    getSchoolList, batchCreateSchool, batchUpdateSchool, rosterPreview, rosterApply, getClassList
+    getSchoolList, batchCreateSchool, batchUpdateSchool, rosterPreview, rosterApply
 } from '../services/api';
-import type { School, ClassEntity } from '../types';
+import type { School } from '../types';
 import * as ExcelJS from 'exceljs';
 
 const { Title, Text } = Typography;
@@ -25,8 +25,6 @@ const SchoolMgmt: React.FC = () => {
 
     // Tab 1: Architecture State
     const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
-    const [selectedClasses, setSelectedClasses] = useState<ClassEntity[]>([]);
-    const [classLoading, setClassLoading] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingSchool, setEditingSchool] = useState<School | null>(null);
     const [createForm] = Form.useForm();
@@ -50,7 +48,6 @@ const SchoolMgmt: React.FC = () => {
                     const fresh = res.data.data.find((s: School) => s.id === selectedSchool.id);
                     if (fresh) {
                         setSelectedSchool(fresh);
-                        fetchClasses(fresh.id);
                     }
                 }
             }
@@ -61,23 +58,9 @@ const SchoolMgmt: React.FC = () => {
         }
     };
 
-    const fetchClasses = async (schoolId: number) => {
-        setClassLoading(true);
-        try {
-            const res = await getClassList(schoolId);
-            if (res.data.code === 200) {
-                setSelectedClasses(res.data.data);
-            }
-        } catch (error) {
-            message.error('获取班级列表失败');
-        } finally {
-            setClassLoading(false);
-        }
-    };
 
     const handleSelectSchool = (school: School) => {
         setSelectedSchool(school);
-        fetchClasses(school.id);
     };
 
     useEffect(() => {
@@ -87,18 +70,21 @@ const SchoolMgmt: React.FC = () => {
     // --- Tab 1: Architecture Logic ---
     const handleOpenCreateModal = () => {
         setEditingSchool(null);
-        createForm.setFieldsValue({ name: '', classes: [{ name: '' }] });
+        createForm.setFieldsValue({ name: '', grades: [{ name: '', classes: [''] }] });
         setIsCreateModalOpen(true);
     };
 
     const handleEditSchool = (school: School) => {
         setEditingSchool(school);
-        const initialClasses = school.classes?.length
-            ? school.classes.map(c => ({ name: c.name }))
-            : [{ name: '' }];
+        const initialGrades = school.grades?.length
+            ? school.grades.map(g => ({
+                name: g.name,
+                classes: g.classes?.map(c => c.name) || ['']
+            }))
+            : [{ name: '', classes: [''] }];
         createForm.setFieldsValue({
             name: school.name,
-            classes: initialClasses
+            grades: initialGrades
         });
         setIsCreateModalOpen(true);
     };
@@ -115,13 +101,16 @@ const SchoolMgmt: React.FC = () => {
             }
 
             setCreating(true);
-            const classList = values.classes ? values.classes.map((c: any) => c.name).filter(Boolean) : [];
+            const formattedGrades = values.grades ? values.grades.map((g: any) => ({
+                name: g.name,
+                classes: g.classes ? g.classes.filter(Boolean) : []
+            })).filter((g: any) => g.name) : [];
 
             let res;
             if (editingSchool) {
-                res = await batchUpdateSchool(editingSchool.id, { name: values.name, classes: classList });
+                res = await batchUpdateSchool(editingSchool.id, { name: values.name, grades: formattedGrades });
             } else {
-                res = await batchCreateSchool({ name: values.name, classes: classList });
+                res = await batchCreateSchool({ name: values.name, grades: formattedGrades });
             }
 
             if (res.data.code === 200) {
@@ -145,9 +134,9 @@ const SchoolMgmt: React.FC = () => {
     const schoolColumns: ColumnsType<School> = [
         { title: '学校名称', dataIndex: 'name', key: 'name', render: (text) => <Text strong>{text}</Text> },
         {
-            title: '班级数量',
-            key: 'classCount',
-            render: (_, r) => <Badge count={r.classes?.length || 0} showZero color="#108ee9" />
+            title: '年级数量',
+            key: 'gradeCount',
+            render: (_, r) => <Badge count={r.grades?.length || 0} showZero color="#108ee9" />
         },
         {
             title: '购买人数',
@@ -173,15 +162,7 @@ const SchoolMgmt: React.FC = () => {
         },
     ];
 
-    const classColumns: ColumnsType<ClassEntity> = [
-        { title: '班级名称', dataIndex: 'name', key: 'name' },
-        {
-            title: '班级人数',
-            dataIndex: 'studentCount',
-            key: 'studentCount',
-            render: (val) => <Tag color="green">{val || 0} 人</Tag>
-        },
-    ];
+    // Removed generateDisplayData and classColumns as they are replaced by hierarchical Collapse UI
 
     // --- Tab 2: Roster Matching Logic ---
     const handleDownloadTemplate = () => {
@@ -189,10 +170,11 @@ const SchoolMgmt: React.FC = () => {
         const sheet = workbook.addWorksheet('名单模板');
         sheet.columns = [
             { header: '学生姓名', key: 'name', width: 20 },
+            { header: '所属年级', key: 'grade', width: 20 },
             { header: '分配班级', key: 'class', width: 20 }
         ];
-        sheet.addRow({ name: '张三', class: '高一(1)班' });
-        sheet.addRow({ name: '李四', class: '高一(2)班' });
+        sheet.addRow({ name: '张三', grade: '高一', class: '(1)班' });
+        sheet.addRow({ name: '李四', grade: '高一', class: '(2)班' });
 
         workbook.xlsx.writeBuffer().then(buffer => {
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -221,9 +203,10 @@ const SchoolMgmt: React.FC = () => {
             sheet.eachRow((row, rowNumber) => {
                 if (rowNumber > 1) { // Skip header
                     const studentName = row.getCell(1).text;
-                    const className = row.getCell(2).text;
-                    if (studentName && className) {
-                        roster.push({ studentName, className });
+                    const gradeName = row.getCell(2).text;
+                    const className = row.getCell(3).text;
+                    if (studentName && className && gradeName) {
+                        roster.push({ studentName, gradeName, className });
                     }
                 }
             });
@@ -286,7 +269,11 @@ const SchoolMgmt: React.FC = () => {
             key: 'name',
             render: (val) => <Text strong>{val}</Text>
         },
-        { title: '分配班级', dataIndex: 'originalClass', key: 'class' },
+        {
+            title: '分配班级',
+            key: 'target',
+            render: (_, r) => <Space><Tag color="blue">{r.originalGrade}</Tag><Tag color="green">{r.originalClass}</Tag></Space>
+        },
         {
             title: '系统匹配订单姓名',
             key: 'matchName',
@@ -382,20 +369,55 @@ const SchoolMgmt: React.FC = () => {
                                 </Col>
                                 <Col span={10}>
                                     <Card
-                                        title={<Space><TeamOutlined />{selectedSchool ? `${selectedSchool.name} - 班级列表` : '班级列表'}</Space>}
+                                        title={<Space><TeamOutlined />{selectedSchool ? `${selectedSchool.name} - 架构详情` : '架构详情'}</Space>}
                                         size="small"
                                         className="h-full"
                                     >
                                         {selectedSchool ? (
-                                            <Table
-                                                columns={classColumns}
-                                                dataSource={selectedClasses}
-                                                rowKey="id"
-                                                loading={classLoading}
-                                                pagination={{ pageSize: 8 }}
-                                            />
+                                            <Collapse
+                                                ghost
+                                                expandIconPosition="end"
+                                                className="bg-white"
+                                            >
+                                                {selectedSchool.grades?.map(grade => (
+                                                    <Collapse.Panel
+                                                        header={
+                                                            <div className="flex justify-between items-center w-full pr-4">
+                                                                <Space>
+                                                                    <Badge status="processing" />
+                                                                    <Text strong style={{ fontSize: '16px' }}>{grade.name}</Text>
+                                                                </Space>
+                                                                <Tag color="blue" bordered={false} style={{ fontSize: '14px', padding: '2px 10px' }}>
+                                                                    年级购买: <Text strong className="text-blue-600">{grade.studentCount || 0}</Text> 人
+                                                                </Tag>
+                                                            </div>
+                                                        }
+                                                        key={grade.id}
+                                                    >
+                                                        <div className="pl-6 py-2">
+                                                            {grade.classes && grade.classes.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-y-2">
+                                                                    {grade.classes.map((cls, idx) => (
+                                                                        <React.Fragment key={cls.id}>
+                                                                            <Space size={4}>
+                                                                                <Text strong>{cls.name}</Text>
+                                                                                <Text type="secondary">共 {cls.studentCount || 0} 人购买</Text>
+                                                                            </Space>
+                                                                            {idx < (grade.classes?.length || 0) - 1 && (
+                                                                                <Text type="secondary" className="mx-4" style={{ opacity: 0.3 }}>|</Text>
+                                                                            )}
+                                                                        </React.Fragment>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <Empty description="暂无班级信息" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                                                            )}
+                                                        </div>
+                                                    </Collapse.Panel>
+                                                ))}
+                                            </Collapse>
                                         ) : (
-                                            <Empty className="py-20" description="请选择左侧学校查看班级" />
+                                            <Empty className="py-20" description="请选择左侧学校查看详情" />
                                         )}
                                     </Card>
                                 </Col>
@@ -514,7 +536,7 @@ const SchoolMgmt: React.FC = () => {
                 width={600}
                 destroyOnClose
             >
-                <Form form={createForm} layout="vertical" initialValues={{ classes: [{ name: '' }] }}>
+                <Form form={createForm} layout="vertical" initialValues={{ grades: [{ name: '', classes: [''] }] }}>
                     <Form.Item
                         name="name"
                         label="学校名称"
@@ -523,33 +545,60 @@ const SchoolMgmt: React.FC = () => {
                         <Input placeholder="如：阳光实验小学" />
                     </Form.Item>
 
-                    <Form.Item label="班级设置">
-                        <Form.List name="classes">
-                            {(fields, { add, remove }) => (
+                    <div style={{ maxHeight: '420px', overflowY: 'auto', padding: '10px', border: '1px solid #f0f0f0', borderRadius: '4px' }}>
+                        <Form.List name="grades">
+                            {(gradeFields, { add: addGrade, remove: removeGrade }) => (
                                 <>
-                                    <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '12px', paddingRight: '8px' }}>
-                                        {fields.map(({ key, name, ...restField }) => (
-                                            <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
-                                                <Form.Item
-                                                    {...restField}
-                                                    name={[name, 'name']}
-                                                    rules={[{ required: true, message: '请输入班级名称' }]}
-                                                >
-                                                    <Input placeholder="如：高一(1)班" style={{ width: 400 }} />
-                                                </Form.Item>
-                                                <Button type="link" danger onClick={() => remove(name)}>删除</Button>
-                                            </Space>
-                                        ))}
-                                    </div>
-                                    <Form.Item>
-                                        <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                                            增加班级
-                                        </Button>
-                                    </Form.Item>
+                                    {gradeFields.map(({ key: gKey, name: gName, ...gRestField }) => (
+                                        <Card
+                                            key={gKey}
+                                            size="small"
+                                            title={`年级 ${gName + 1}`}
+                                            extra={<Button type="link" danger onClick={() => removeGrade(gName)}>删除年级</Button>}
+                                            style={{ marginBottom: 16, background: '#fafafa' }}
+                                        >
+                                            <Form.Item
+                                                {...gRestField}
+                                                name={[gName, 'name']}
+                                                label="年级名称"
+                                                rules={[{ required: true, message: '请输入年级名称' }]}
+                                            >
+                                                <Input placeholder="如：高一、一年级" />
+                                            </Form.Item>
+
+                                            <Form.Item label="班级列表">
+                                                <Form.List name={[gName, 'classes']}>
+                                                    {(classFields, { add: addClass, remove: removeClass }) => (
+                                                        <>
+                                                            {classFields.map((cField, cIndex) => (
+                                                                <Space key={cField.key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                                                                    <Form.Item
+                                                                        {...cField}
+                                                                        rules={[{ required: true, message: '请输入班级名称' }]}
+                                                                    >
+                                                                        <Input placeholder="如：1班" style={{ width: 300 }} />
+                                                                    </Form.Item>
+                                                                    {classFields.length > 1 && (
+                                                                        <Button type="link" danger onClick={() => removeClass(cIndex)}>删除</Button>
+                                                                    )}
+                                                                </Space>
+                                                            ))}
+                                                            <Button type="dashed" onClick={() => addClass()} block icon={<PlusOutlined />}>
+                                                                增加班级
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </Form.List>
+                                            </Form.Item>
+                                        </Card>
+                                    ))}
+                                    <Button type="dashed" onClick={() => addGrade({ name: '', classes: [''] })} block icon={<PlusOutlined />} style={{ marginTop: 16 }}>
+                                        增加年级
+                                    </Button>
                                 </>
                             )}
                         </Form.List>
-                    </Form.Item>
+                    </div>
                 </Form>
             </Modal>
         </div>

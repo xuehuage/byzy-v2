@@ -1,5 +1,6 @@
 import { AppDataSource } from "../data-source"
 import { School } from "../entity/School"
+import { Grade } from "../entity/Grade"
 import { Product } from "../entity/Product"
 import { Class } from "../entity/Class"
 import { Student } from "../entity/Student"
@@ -12,7 +13,7 @@ export class ImportService {
         return await AppDataSource.manager.transaction(async (transactionalEntityManager) => {
             const { schoolName, products, students } = data
 
-            // 1. 处理学校信息 (Handle School)
+            // 1. Handle School
             let school = await transactionalEntityManager.findOne(School, { where: { name: schoolName } })
             if (!school) {
                 school = new School()
@@ -21,7 +22,7 @@ export class ImportService {
                 await transactionalEntityManager.save(school)
             }
 
-            // 2. 处理产品信息 (Handle Products) - 删除旧的，插入新的
+            // 2. Handle Products
             if (products && products.length > 0) {
                 await transactionalEntityManager.delete(Product, { schoolId: school.id })
                 const productEntities = products.map(p => {
@@ -29,7 +30,6 @@ export class ImportService {
                     product.schoolId = school.id
                     product.type = p.type
                     product.price = Math.round(Number(p.price) * 100)
-                    // Set product name based on type
                     if (p.type === 0) product.name = "夏装"
                     else if (p.type === 1) product.name = "春秋装"
                     else if (p.type === 2) product.name = "冬装"
@@ -39,20 +39,54 @@ export class ImportService {
                 await transactionalEntityManager.save(productEntities)
             }
 
-            // 缓存产品信息 (Cache product info)
             const currentProducts = await transactionalEntityManager.find(Product, { where: { schoolId: school.id } })
             const productMap = new Map<number, Product>()
             currentProducts.forEach(p => productMap.set(p.type, p))
 
-            // 3. 处理学生和订单 (Process Students & Orders)
+            // 3. Process Hierarchies and Students
+            const gradeCache = new Map<string, Grade>()
             const classCache = new Map<string, Class>()
             const skippedStudents: any[] = []
             let importedCount = 0
 
             for (const studentData of students) {
-                // Check if student already has orders for this school
+                let gradeEntity: Grade | undefined | null = gradeCache.get(studentData.gradeName)
+                if (!gradeEntity) {
+                    gradeEntity = await transactionalEntityManager.findOne(Grade, {
+                        where: { schoolId: school.id, name: studentData.gradeName }
+                    })
+                    if (!gradeEntity) {
+                        gradeEntity = new Grade()
+                        gradeEntity.schoolId = school.id
+                        gradeEntity.name = studentData.gradeName
+                        await transactionalEntityManager.save(gradeEntity)
+                    }
+                    gradeCache.set(studentData.gradeName, gradeEntity)
+                }
+
+                // Handle Class
+                const classKey = `${studentData.gradeName}-${studentData.className}`
+                let classEntity: Class | undefined | null = classCache.get(classKey)
+                if (!classEntity) {
+                    classEntity = await transactionalEntityManager.findOne(Class, {
+                        where: { gradeId: gradeEntity.id, name: studentData.className }
+                    })
+                    if (!classEntity) {
+                        classEntity = new Class()
+                        classEntity.gradeId = gradeEntity.id
+                        classEntity.name = studentData.className
+                        await transactionalEntityManager.save(classEntity)
+                    }
+                    classCache.set(classKey, classEntity)
+                }
+
+                // Check for existing student based on new unique constraint
                 const existingStudent = await transactionalEntityManager.findOne(Student, {
-                    where: { idCard: studentData.idCard },
+                    where: {
+                        name: studentData.studentName,
+                        phone: studentData.phone,
+                        birthday: studentData.birthday
+                    },
                     relations: ["orders"]
                 })
 
@@ -65,61 +99,39 @@ export class ImportService {
                     continue
                 }
 
-                // 处理班级 (Handle Class)
-                let classEntity: Class | undefined | null = classCache.get(studentData.className)
-                if (!classEntity) {
-                    classEntity = await transactionalEntityManager.findOne(Class, {
-                        where: { schoolId: school.id, name: studentData.className }
-                    })
-                    if (!classEntity) {
-                        classEntity = new Class()
-                        classEntity.schoolId = school.id
-                        classEntity.name = studentData.className
-                        await transactionalEntityManager.save(classEntity)
-                    }
-                    classCache.set(studentData.className, classEntity)
-                }
-
-                // 处理学生 (Handle Student)
                 let student = existingStudent
                 if (student) {
-                    // 更新现有学生 (Update existing) - should have classId updated if changed in excel
-                    student.name = studentData.studentName
+                    student.gradeId = gradeEntity.id
                     student.classId = classEntity.id
+                    student.idCard = studentData.idCard
                 } else {
-                    // 创建新学生 (Create new)
                     student = new Student()
                     student.name = studentData.studentName
+                    student.phone = studentData.phone
+                    student.birthday = studentData.birthday
                     student.idCard = studentData.idCard
+                    student.gradeId = gradeEntity.id
                     student.classId = classEntity.id
                 }
                 const savedStudent = await transactionalEntityManager.save(student)
 
-                // 计算订单金额 (Calculate Order Amount)
                 let totalAmount = 0
                 const items: { type: number, qty: number, price: number }[] = []
 
-                if (studentData.summerQty > 0) {
-                    const product = productMap.get(0)
-                    const price = product ? Number(product.price) : 0
-                    totalAmount += price * studentData.summerQty
-                    items.push({ type: 0, qty: studentData.summerQty, price })
-                }
-                if (studentData.springQty > 0) {
-                    const product = productMap.get(1)
-                    const price = product ? Number(product.price) : 0
-                    totalAmount += price * studentData.springQty
-                    items.push({ type: 1, qty: studentData.springQty, price })
-                }
-                if (studentData.winterQty > 0) {
-                    const product = productMap.get(2)
-                    const price = product ? Number(product.price) : 0
-                    totalAmount += price * studentData.winterQty
-                    items.push({ type: 2, qty: studentData.winterQty, price })
+                const checkQty = (qty: number, type: number) => {
+                    if (qty > 0) {
+                        const product = productMap.get(type)
+                        const price = product ? Number(product.price) : 0
+                        totalAmount += price * qty
+                        items.push({ type, qty, price })
+                    }
                 }
 
+                checkQty(studentData.summerQty, 0)
+                checkQty(studentData.autumnQty, 1)
+                checkQty(studentData.winterQty, 2)
+
                 if (items.length > 0) {
-                    // 创建订单 (Create Order)
                     const order = new Order()
                     order.studentId = savedStudent.id
                     order.orderNo = `SID${savedStudent.id}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
@@ -127,14 +139,11 @@ export class ImportService {
                     order.status = OrderStatus.PENDING
                     const savedOrder = await transactionalEntityManager.save(order)
 
-                    // 创建订单项 (Create Order Items)
                     const orderItems = items.map(item => {
                         const orderItem = new OrderItem()
                         orderItem.order = savedOrder
                         const product = productMap.get(item.type)
-                        if (product) {
-                            orderItem.product = product
-                        }
+                        if (product) orderItem.product = product
                         orderItem.quantity = item.qty
                         orderItem.priceSnapshot = item.price
                         return orderItem

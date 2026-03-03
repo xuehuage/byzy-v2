@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm"
 import { Product } from "./Product"
-import { Class } from "./Class"
+import { Grade } from "./Grade"
 
 @Entity("schools")
 export class School {
@@ -52,6 +52,6 @@ export class School {
     @OneToMany(() => Product, (product) => product.school)
     products!: Product[]
 
-    @OneToMany(() => Class, (cls) => cls.school)
-    classes!: Class[]
+    @OneToMany(() => Grade, (grade) => grade.school)
+    grades!: Grade[]
 }

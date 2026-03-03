@@ -42,14 +42,22 @@ export class ImportController {
             const classRepo = AppDataSource.getRepository(Class)
             const studentRepo = AppDataSource.getRepository(Student)
 
-            // Get all classes for this school to map className -> classId
-            const schoolClasses = await classRepo.findBy({ schoolId })
-            const classNameToId = new Map(schoolClasses.map(c => [c.name, c.id]))
+            // Get all grades and classes for this school to build a nested map
+            const schoolClasses = await classRepo.createQueryBuilder("c")
+                .innerJoinAndSelect("c.grade", "g")
+                .where("g.schoolId = :schoolId", { schoolId })
+                .getMany()
+
+            // Map key: "gradeName-className", value: classId
+            const classIdentifierToId = new Map(schoolClasses.map(c => [`${c.grade.name}-${c.name}`, c.id]))
+            // Map key: classId, value: gradeId (for rosterApply or verification)
+            const classToGradeId = new Map(schoolClasses.map(c => [c.id, c.gradeId]))
 
             const results = []
             for (const item of roster) {
-                const { studentName, className } = item
-                const targetClassId = classNameToId.get(className)
+                const { studentName, gradeName, className } = item
+                const classKey = `${gradeName}-${className}`
+                const targetClassId = classIdentifierToId.get(classKey)
 
                 // Search for students with this name in this school (via existing classes or those who haven't been assigned yet)
                 // Actually, V2 students might NOT have a classId yet. 
@@ -112,6 +120,7 @@ export class ImportController {
 
                 results.push({
                     originalName: studentName,
+                    originalGrade: gradeName,
                     originalClass: className,
                     targetClassId,
                     status,
@@ -145,12 +154,17 @@ export class ImportController {
             }
 
             const studentRepo = AppDataSource.getRepository(Student)
+            const classRepo = AppDataSource.getRepository(Class)
 
-            // Perform updates in a loop or batch
-            // Logic: Update student SET classId = match.classId WHERE id = match.studentId
             for (const match of matches) {
                 if (match.studentId && match.classId) {
-                    await studentRepo.update(match.studentId, { classId: match.classId })
+                    const classEntity = await classRepo.findOne({ where: { id: match.classId } })
+                    if (classEntity) {
+                        await studentRepo.update(match.studentId, {
+                            classId: match.classId,
+                            gradeId: classEntity.gradeId
+                        })
+                    }
                 }
             }
 

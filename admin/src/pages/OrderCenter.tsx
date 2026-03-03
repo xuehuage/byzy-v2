@@ -11,6 +11,7 @@ const { Text } = Typography;
 const OrderCenter: React.FC = () => {
     const [form] = Form.useForm();
     const [schools, setSchools] = useState<School[]>([]);
+    const [grades, setGrades] = useState<any[]>([]);
     const [classes, setClasses] = useState<ClassEntity[]>([]);
     const [loading, setLoading] = useState(false);
     const [orderList, setOrderList] = useState<OrderUIItem[]>([]);
@@ -20,7 +21,7 @@ const OrderCenter: React.FC = () => {
 
     useEffect(() => {
         fetchSchools();
-        fetchOrders();
+        // Removed fetchOrders() from here as it's handled by fetchSchools() setting the first school
     }, []);
 
     const fetchSchools = async () => {
@@ -41,11 +42,22 @@ const OrderCenter: React.FC = () => {
         }
     };
 
-    const handleSchoolChange = async (value: number) => {
+    const handleSchoolChange = (schoolId: number) => {
+        form.setFieldsValue({ gradeId: undefined, classId: undefined });
+        setClasses([]);
+        if (schoolId) {
+            const school = schools.find(s => s.id === schoolId);
+            setGrades(school?.grades || []);
+        } else {
+            setGrades([]);
+        }
+    };
+
+    const handleGradeChange = async (gradeId: number) => {
         form.setFieldsValue({ classId: undefined });
-        if (value) {
+        if (gradeId) {
             try {
-                const res = await getClassList(value);
+                const res = await getClassList({ gradeId });
                 if (res.data.code === 200) setClasses(res.data.data);
             } catch (error) {
                 message.error('获取班级失败');
@@ -56,9 +68,15 @@ const OrderCenter: React.FC = () => {
     };
 
     const fetchOrders = async (p = pagination.page, overrides?: any) => {
+        const values = { ...form.getFieldsValue(), ...overrides };
+        if (!values.schoolId || values.schoolId === 'all') {
+            setOrderList([]);
+            setTotal(0);
+            setSummary(null);
+            return;
+        }
         setLoading(true);
         try {
-            const values = { ...form.getFieldsValue(), ...overrides };
             const res = await getOrderList({
                 page: p,
                 pageSize: pagination.pageSize,
@@ -67,9 +85,9 @@ const OrderCenter: React.FC = () => {
             if (res.data.code === 200) {
                 setOrderList(res.data.data.list.map((o: any) => ({
                     ...o,
-                    studentName: o.student?.name,
-                    studentPhone: o.student?.phone,
-                    className: o.student?.class?.name
+                    studentName: o.student?.name || '未知',
+                    studentPhone: o.student?.phone || '未知',
+                    className: o.student?.class?.name || o.student?.grade?.name || '未分班'
                 })));
                 setTotal(res.data.data.total);
                 setSummary(res.data.data.summary);
@@ -93,7 +111,7 @@ const OrderCenter: React.FC = () => {
                 <Space direction="vertical" size={0}>
                     {r.items?.map((item, idx) => (
                         <Text key={idx} type="secondary">
-                            {item.product?.name}: {item.size || '未填'} ({item.quantity}件)
+                            {item.product?.name}: {item.size || '未填'} ({item.quantity}套)
                         </Text>
                     ))}
                 </Space>
@@ -134,11 +152,11 @@ const OrderCenter: React.FC = () => {
                         {summary ? (
                             summary.studentName ? (
                                 <Text type="secondary">
-                                    {summary.schoolName || ''} {summary.className || ''} {summary.studentName} 共 {summary.summerQty}套夏装，{summary.springQty}套秋装，{summary.winterQty}套冬装，总金额 ¥{(summary.totalRevenue / 100).toFixed(2)}
+                                    {summary.schoolName || ''} {summary.className || ''} {summary.studentName} 共 {summary.summerQty}套夏装，{summary.autumnQty}套秋装，{summary.winterQty}套冬装，总金额 ¥{(summary.totalRevenue / 100).toFixed(2)}
                                 </Text>
                             ) : (
                                 <Text type="secondary">
-                                    {summary.schoolName || '全校'} {summary.className || ''} 共 {summary.summerQty}套夏装，{summary.springQty}套秋装，{summary.winterQty}套冬装，总金额 ¥{(summary.totalRevenue / 100).toFixed(2)}
+                                    {summary.schoolName || '全校'} {summary.className || ''} 共 {summary.summerQty}套夏装，{summary.autumnQty}套秋装，{summary.winterQty}套冬装，总金额 ¥{(summary.totalRevenue / 100).toFixed(2)}
                                 </Text>
                             )
                         ) : (
@@ -150,17 +168,42 @@ const OrderCenter: React.FC = () => {
 
             <Card className="mb-6 bg-gray-50 border-none">
                 <Form form={form} layout="vertical" onFinish={() => { setPagination({ ...pagination, page: 1 }); fetchOrders(1); }}>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <Form.Item name="schoolId" label="学校" className="!mb-0">
-                            <Select placeholder="全选" allowClear onChange={handleSchoolChange}>
-                                {schools.map(s => <Option key={s.id} value={s.id}>{s.name}</Option>)}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <Form.Item label="学校" name="schoolId" className="!mb-0">
+                            <Select placeholder="选择学校" allowClear onChange={handleSchoolChange}>
+                                {schools.map(school => (
+                                    <Option key={school.id} value={school.id}>{school.name}</Option>
+                                ))}
                             </Select>
                         </Form.Item>
-                        <Form.Item name="classId" label="班级" className="!mb-0">
-                            <Select placeholder="选择班级" allowClear disabled={!classes.length}>
-                                {classes.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+
+                        <Form.Item label="年级" name="gradeId" className="!mb-0">
+                            <Select
+                                placeholder="选择年级"
+                                onChange={handleGradeChange}
+                                allowClear
+                                disabled={!grades.length}
+                            >
+                                <Option key="all" value="all">全部</Option>
+                                {grades.map(grade => (
+                                    <Option key={grade.id} value={grade.id}>{grade.name}</Option>
+                                ))}
                             </Select>
                         </Form.Item>
+
+                        <Form.Item label="班级" name="classId" className="!mb-0">
+                            <Select
+                                placeholder="选择班级"
+                                allowClear
+                                disabled={!classes.length}
+                            >
+                                <Option key="all" value="all">全部</Option>
+                                {classes.map(cls => (
+                                    <Option key={cls.id} value={cls.id}>{cls.name}</Option>
+                                ))}
+                            </Select>
+                        </Form.Item>
+
                         <Form.Item name="status" label="状态" className="!mb-0">
                             <Select placeholder="不限" allowClear>
                                 <Option value="PENDING">待支付</Option>
@@ -181,10 +224,11 @@ const OrderCenter: React.FC = () => {
                                 <Button type="primary" icon={<SearchOutlined />} htmlType="submit">查询</Button>
                                 <Button icon={<ReloadOutlined />} onClick={() => {
                                     form.resetFields();
+                                    setGrades([]);
                                     setClasses([]);
                                     if (schools.length > 0) {
                                         const firstSchoolId = schools[0].id;
-                                        form.setFieldsValue({ schoolId: firstSchoolId });
+                                        form.setFieldsValue({ schoolId: firstSchoolId, gradeId: undefined, classId: undefined });
                                         handleSchoolChange(firstSchoolId);
                                         fetchOrders(1, { schoolId: firstSchoolId });
                                     } else {

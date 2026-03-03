@@ -36,9 +36,9 @@ const Dashboard: React.FC = () => {
                     key: item.id.toString(),
                     schoolName: item.name,
                     summerQty: item.summerQty || 0,
-                    autumnQty: item.springQty || 0, // Backend uses springQty
+                    autumnQty: item.autumnQty || 0, // Backend now uses autumnQty
                     winterQty: item.winterQty || 0,
-                    totalAmount: (item.paidAmount || 0) / 100, // Convert cents to yuan
+                    totalAmount: item.paidAmount || 0, // Backend already converted to 元
                 }));
                 setData(mappedData);
             }

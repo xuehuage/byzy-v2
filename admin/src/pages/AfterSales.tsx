@@ -113,7 +113,10 @@ const AfterSales: React.FC = () => {
             key: 'items',
             render: (_, r) => {
                 if (r.type === 'EXCHANGE') {
-                    return <Text type="secondary">{r.originalSize} → <Text strong style={{ color: '#1677ff' }}>{r.newSize || '待确认'}</Text></Text>;
+                    const newSizeDisplay = r.isSpecialSize
+                        ? <Tag color="purple">特殊:{r.height}cm/{r.weight}斤</Tag>
+                        : <Text strong style={{ color: '#1677ff' }}>{r.newSize || '160#'}</Text>;
+                    return <Text type="secondary">{r.originalSize} → {newSizeDisplay}</Text>;
                 }
                 return <Text type="secondary">{buildItemsDesc((r.order as any)?.items)}</Text>;
             }
@@ -201,7 +204,13 @@ const AfterSales: React.FC = () => {
                         {selectedRecord.type === 'EXCHANGE' ? (
                             <>
                                 <Descriptions.Item label="当前尺码">{selectedRecord.originalSize}</Descriptions.Item>
-                                <Descriptions.Item label="目标尺码" contentStyle={{ color: '#1677ff', fontWeight: 'bold' }}>{selectedRecord.newSize}</Descriptions.Item>
+                                <Descriptions.Item label="目标尺码" contentStyle={{ color: '#1677ff', fontWeight: 'bold' }}>
+                                    {selectedRecord.isSpecialSize ? (
+                                        <Badge status="warning" text={`特殊尺码 (${selectedRecord.height}cm / ${selectedRecord.weight}斤)`} />
+                                    ) : (
+                                        selectedRecord.newSize || '160#'
+                                    )}
+                                </Descriptions.Item>
                                 <Descriptions.Item label="调换数量">{selectedRecord.newQuantity} 件</Descriptions.Item>
                             </>
                         ) : (

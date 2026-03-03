@@ -122,13 +122,26 @@ export class AfterSalesController {
 
     static async create(req: Request, res: Response) {
         try {
-            const { order_id, type, original_size, new_size, original_quantity, new_quantity } = req.body
-            if (!order_id || !type || !original_quantity) {
+            console.log('[AfterSales] Create record request:', JSON.stringify(req.body))
+            const { order_id, type, original_size, new_size, original_quantity, new_quantity, is_special_size, height, weight } = req.body
+
+            // Loose check for order_id to support string numbers and explicit 0 checks
+            if ((order_id === undefined || order_id === null || order_id === '') || !type) {
+                console.warn('[AfterSales] Incomplete params:', { order_id, type })
                 return res.status(400).json({ code: 400, message: "参数不完整" })
             }
 
-            const order = await AppDataSource.getRepository(Order).findOne({ where: { id: Number(order_id) } })
+            const order = await AppDataSource.getRepository(Order).findOne({
+                where: { id: Number(order_id) },
+                relations: ["items"]
+            })
             if (!order) return res.status(404).json({ code: 404, message: "订单不存在" })
+
+            // Only allow after-sales for orders that have been PAID or SHIPPED
+            const allowedStatuses = [OrderStatus.PAID, OrderStatus.SHIPPED]
+            if (!allowedStatuses.includes(order.status)) {
+                return res.status(400).json({ code: 400, message: "只有已支付或已发货的订单可以申请售后" })
+            }
 
             if (type === "REFUND") {
                 order.status = OrderStatus.REFUNDING
@@ -138,20 +151,38 @@ export class AfterSalesController {
                 await AppDataSource.getRepository(Order).save(order)
             }
 
+            const primaryItem = order.items?.[0]
+            const finalOriginalSize = original_size || primaryItem?.size || "未填"
+            const finalOriginalQty = Number(original_quantity || primaryItem?.quantity || 1)
+
             const record = AppDataSource.getRepository(AfterSalesRecord).create({
                 orderId: Number(order_id),
                 type,
-                originalSize: original_size || "",
+                originalSize: finalOriginalSize,
                 newSize: new_size || null,
-                originalQuantity: Number(original_quantity),
-                newQuantity: Number(new_quantity || original_quantity),
+                originalQuantity: finalOriginalQty,
+                newQuantity: Number(new_quantity || finalOriginalQty),
+                isSpecialSize: !!is_special_size,
+                height: height ? Number(height) : null,
+                weight: weight ? Number(weight) : null,
             })
+
             await AppDataSource.getRepository(AfterSalesRecord).save(record)
 
             return res.json({ code: 200, message: "申请已提交", data: record })
-        } catch (error) {
-            console.error("Create after-sales error:", error)
-            res.status(500).json({ code: 500, message: "Internal server error" })
+        } catch (error: any) {
+            console.error("Create after-sales error detail:", error)
+            const msg = error.message || ""
+
+            // Comprehensive schema check
+            if (msg.includes("Unknown column") || msg.includes("has no column") || msg.includes("Data truncated")) {
+                return res.status(500).json({
+                    code: 500,
+                    message: `数据库结构陈旧：${msg.includes("status") ? "订单状态值不匹配" : "缺少尺码/身高/体重字段"}。请执行 v2_db_migration.sql 中的更新脚本。`
+                })
+            }
+
+            res.status(500).json({ code: 500, message: msg || "Internal server error" })
         }
     }
 }

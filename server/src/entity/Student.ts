@@ -1,19 +1,19 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm"
 import { Class } from "./Class"
-import { School } from "./School"
+import { Grade } from "./Grade"
 import { Order } from "./Order"
 
 @Entity("students")
-@Index("UQ_student_identity", ["name", "phone", "birthday", "schoolId"], { unique: true })
+@Index("UQ_student_identity", ["name", "phone", "birthday"], { unique: true })
 export class Student {
     @PrimaryGeneratedColumn()
     id!: number
 
+    @Column({ name: 'grade_id', type: "int", nullable: true })
+    gradeId!: number | null
+
     @Column({ name: 'class_id', type: "int", nullable: true })
     classId!: number | null
-
-    @Column({ name: 'school_id', type: "int", nullable: true })
-    schoolId!: number | null
 
     @Column()
     name!: string
@@ -37,9 +37,9 @@ export class Student {
     @JoinColumn({ name: "class_id" })
     class!: Class
 
-    @ManyToOne(() => School)
-    @JoinColumn({ name: "school_id" })
-    school!: School
+    @ManyToOne(() => Grade, (grade) => grade.students)
+    @JoinColumn({ name: "grade_id" })
+    grade!: Grade
 
     @OneToMany(() => Order, (order) => order.student)
     orders!: Order[]

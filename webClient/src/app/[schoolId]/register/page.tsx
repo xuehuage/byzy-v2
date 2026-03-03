@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, use, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Input, Form, Typography, Card } from 'antd';
-import { DatePicker as MobileDatePicker } from 'antd-mobile';
-import { UserOutlined, PhoneOutlined, CalendarOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { DatePicker as MobileDatePicker, Picker } from 'antd-mobile';
+import { UserOutlined, PhoneOutlined, CalendarOutlined, ArrowLeftOutlined, ClusterOutlined, TeamOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import Footer from '@/components/Footer';
+import { fetchPublicSchoolDetail } from '@/api/studentApi';
 
 const { Title, Text } = Typography;
 
@@ -19,14 +20,56 @@ export default function RegisterPage({ params }: { params: Promise<{ schoolId: s
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [pickerVisible, setPickerVisible] = useState(false);
+    const [gradePickerVisible, setGradePickerVisible] = useState(false);
+    const [classPickerVisible, setClassPickerVisible] = useState(false);
+
+    const [schoolData, setSchoolData] = useState<any>(null);
+    const [grades, setGrades] = useState<any[]>([]);
+    const [classes, setClasses] = useState<any[]>([]);
+
     const birthdayValue = Form.useWatch('birthday', form);
+    const gradeId = Form.useWatch('gradeId', form);
+    const classId = Form.useWatch('classId', form);
+
+    useEffect(() => {
+        const loadSchoolData = async () => {
+            try {
+                const res = await fetchPublicSchoolDetail(Number(schoolId));
+                if (res.code === 200) {
+                    setSchoolData(res.data);
+                    setGrades(res.data.grades || []);
+                }
+            } catch (err) {
+                console.error('Failed to load school data', err);
+            }
+        };
+        loadSchoolData();
+    }, [schoolId]);
+
+    // Update classes when grade changes
+    useEffect(() => {
+        if (gradeId) {
+            const selectedGrade = grades.find(g => g.id === gradeId);
+            setClasses(selectedGrade?.classes || []);
+            // Only reset classId if it's not currently valid for the new grade
+            const isValidClass = selectedGrade?.classes?.some((c: any) => c.id === classId);
+            if (!isValidClass) {
+                form.setFieldsValue({ classId: undefined });
+            }
+        } else {
+            setClasses([]);
+            form.setFieldsValue({ classId: undefined });
+        }
+    }, [gradeId, grades, form]);
 
     const onFinish = async (values: any) => {
         setLoading(true);
         try {
-            // values.birthday is already a string from native input, or we handle dayjs if needed
             const birthday = typeof values.birthday === 'string' ? values.birthday : values.birthday.format('YYYY-MM-DD');
-            const queryString = `name=${encodeURIComponent(values.name)}&phone=${values.phone}&birthday=${birthday}`;
+            let queryString = `name=${encodeURIComponent(values.name)}&phone=${values.phone}&birthday=${birthday}`;
+
+            if (values.gradeId) queryString += `&gradeId=${values.gradeId}`;
+            if (values.classId) queryString += `&classId=${values.classId}`;
 
             if (type === 'order') {
                 router.push(`/${schoolId}/order?${queryString}`);
@@ -37,6 +80,9 @@ export default function RegisterPage({ params }: { params: Promise<{ schoolId: s
             setLoading(false);
         }
     };
+
+    const gradeOptions = grades.map(g => ({ label: g.name, value: g.id }));
+    const classOptions = classes.map(c => ({ label: c.name, value: c.id }));
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
@@ -66,6 +112,58 @@ export default function RegisterPage({ params }: { params: Promise<{ schoolId: s
                         size="large"
                         requiredMark={false}
                     >
+                        {grades.length > 0 && (
+                            <Form.Item
+                                name="gradeId"
+                                label={<span className="font-semibold text-gray-700">年级</span>}
+                                rules={[{ required: true, message: '请选择年级' }]}
+                            >
+                                <div className="relative cursor-pointer" onClick={() => setGradePickerVisible(true)}>
+                                    <Input
+                                        prefix={<ClusterOutlined className="text-gray-400 mr-2" />}
+                                        placeholder="请选择年级"
+                                        value={grades.find(g => g.id === gradeId)?.name}
+                                        readOnly
+                                        className="rounded-xl border-gray-200 py-3 pointer-events-none"
+                                    />
+                                    <Picker
+                                        columns={[gradeOptions]}
+                                        visible={gradePickerVisible}
+                                        onClose={() => setGradePickerVisible(false)}
+                                        onConfirm={(val) => {
+                                            form.setFieldsValue({ gradeId: val[0] });
+                                        }}
+                                    />
+                                </div>
+                            </Form.Item>
+                        )}
+
+                        {classes.length > 0 && (
+                            <Form.Item
+                                name="classId"
+                                label={<span className="font-semibold text-gray-700">班级</span>}
+                                rules={[{ required: true, message: '请选择班级' }]}
+                            >
+                                <div className="relative cursor-pointer" onClick={() => setClassPickerVisible(true)}>
+                                    <Input
+                                        prefix={<TeamOutlined className="text-gray-400 mr-2" />}
+                                        placeholder="请选择班级"
+                                        value={classes.find(c => c.id === classId)?.name}
+                                        readOnly
+                                        className="rounded-xl border-gray-200 py-3 pointer-events-none"
+                                    />
+                                    <Picker
+                                        columns={[classOptions]}
+                                        visible={classPickerVisible}
+                                        onClose={() => setClassPickerVisible(false)}
+                                        onConfirm={(val) => {
+                                            form.setFieldsValue({ classId: val[0] });
+                                        }}
+                                    />
+                                </div>
+                            </Form.Item>
+                        )}
+
                         <Form.Item
                             name="name"
                             label={<span className="font-semibold text-gray-700">学生姓名</span>}

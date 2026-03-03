@@ -9,14 +9,15 @@ import { Brackets } from "typeorm"
 export class OrderController {
     static async search(req: Request, res: Response) {
         try {
-            const { page = 1, pageSize = 10, schoolId, classId, status, uniformType, keyword, studentName, idCard } = req.query
+            const { page = 1, pageSize = 10, schoolId, gradeId, classId, status, uniformType, keyword, studentName, idCard } = req.query
             const skip = (Number(page) - 1) * Number(pageSize)
             const take = Number(pageSize)
 
             const queryBuilder = AppDataSource.getRepository(Order).createQueryBuilder("order")
                 .leftJoinAndSelect("order.student", "student")
+                .leftJoinAndSelect("student.grade", "grade")
+                .leftJoinAndSelect("grade.school", "school")
                 .leftJoinAndSelect("student.class", "class")
-                .leftJoinAndSelect("class.school", "school")
                 .leftJoinAndSelect("order.items", "items")
                 .leftJoinAndSelect("items.product", "product")
                 .leftJoinAndSelect("order.afterSales", "afterSales")
@@ -26,6 +27,10 @@ export class OrderController {
 
             if (schoolId && schoolId !== 'all') {
                 queryBuilder.andWhere("school.id = :schoolId", { schoolId })
+            }
+
+            if (gradeId && gradeId !== 'all') {
+                queryBuilder.andWhere("grade.id = :gradeId", { gradeId })
             }
 
             if (classId && classId !== 'all') {
@@ -79,19 +84,24 @@ export class OrderController {
             // Create a dedicated summary query with same filters
             const summaryQuery = AppDataSource.getRepository(Order).createQueryBuilder("order")
                 .leftJoin("order.student", "student")
-                .leftJoin("student.class", "class")
-                .leftJoin("class.school", "school")
+                .leftJoin("student.grade", "grade")
+                .leftJoin("grade.school", "school")
                 .leftJoin("order.items", "items")
                 .leftJoin("items.product", "product")
+                .leftJoin("student.class", "class")
                 .select("SUM(order.totalAmount)", "totalRevenue")
                 .addSelect("SUM(CASE WHEN product.type = 0 THEN items.quantity ELSE 0 END)", "summerQty")
-                .addSelect("SUM(CASE WHEN product.type = 1 THEN items.quantity ELSE 0 END)", "springQty")
+                .addSelect("SUM(CASE WHEN product.type = 1 THEN items.quantity ELSE 0 END)", "autumnQty")
                 .addSelect("SUM(CASE WHEN product.type = 2 THEN items.quantity ELSE 0 END)", "winterQty")
+                .where("order.status NOT IN (:...summaryExclude)", { summaryExclude: [OrderStatus.CANCELLED, OrderStatus.REFUNDED] })
 
-            // Apply same filters (could be refactored into a helper function, but let's keep it simple for now)
+            // Apply same filters
             if (schoolId && schoolId !== 'all') summaryQuery.andWhere("school.id = :schoolId", { schoolId })
+            if (gradeId && gradeId !== 'all') summaryQuery.andWhere("grade.id = :gradeId", { gradeId })
             if (classId && classId !== 'all') summaryQuery.andWhere("class.id = :classId", { classId })
             if (status && status !== 'all') summaryQuery.andWhere("order.status = :status", { status })
+
+            // ... keyword filters apply similarly via andWhere ...
             if (studentName) summaryQuery.andWhere("student.name LIKE :studentName", { studentName: `%${studentName}%` })
             if (idCard) summaryQuery.andWhere("student.idCard LIKE :idCard", { idCard: `%${idCard}%` })
             if (keyword) {
@@ -112,19 +122,22 @@ export class OrderController {
                 schoolName = s?.name
             }
             if (classId && classId !== 'all') {
-                const c = await AppDataSource.getRepository("Class").findOne({ where: { id: Number(classId) }, relations: ["school"] }) as any
+                const c = await AppDataSource.getRepository("Class").findOne({
+                    where: { id: Number(classId) },
+                    relations: ["grade", "grade.school"]
+                }) as any
                 className = c?.name
-                if (!schoolName) schoolName = c?.school?.name
+                if (!schoolName) schoolName = c?.grade?.school?.name
             }
             if (list.length === 1 && keyword) {
                 foundStudentName = list[0].student?.name
             }
 
             const summary = {
-                totalRevenue: Number(rawSummary.totalRevenue || 0),
-                summerQty: Number(rawSummary.summerQty || 0),
-                springQty: Number(rawSummary.springQty || 0),
-                winterQty: Number(rawSummary.winterQty || 0),
+                totalRevenue: Number(rawSummary?.totalRevenue || 0),
+                summerQty: Number(rawSummary?.summerQty || 0),
+                autumnQty: Number(rawSummary?.autumnQty || 0),
+                winterQty: Number(rawSummary?.winterQty || 0),
                 schoolName,
                 className,
                 studentName: foundStudentName
@@ -132,15 +145,15 @@ export class OrderController {
 
             // Pre-calculate quantities for simpler frontend rendering
             const formattedList = list.map(order => {
-                const summerQty = order.items.filter(i => i.product.type === 0).reduce((sum, i) => sum + i.quantity, 0)
-                const springQty = order.items.filter(i => i.product.type === 1).reduce((sum, i) => sum + i.quantity, 0)
-                const winterQty = order.items.filter(i => i.product.type === 2).reduce((sum, i) => sum + i.quantity, 0)
+                const summerQty = (order.items || []).filter(i => i.product.type === 0).reduce((sum, i) => sum + i.quantity, 0)
+                const autumnQty = (order.items || []).filter(i => i.product.type === 1).reduce((sum, i) => sum + i.quantity, 0)
+                const winterQty = (order.items || []).filter(i => i.product.type === 2).reduce((sum, i) => sum + i.quantity, 0)
 
                 return {
                     ...order,
                     totalAmount: order.totalAmount,
                     summerQty,
-                    springQty,
+                    autumnQty,
                     winterQty
                 }
             })
@@ -171,7 +184,7 @@ export class OrderController {
                 // 1. Find Student and their orders
                 const student = await transactionalEntityManager.findOne(Student, {
                     where: { idCard },
-                    relations: ["class", "class.school", "orders"]
+                    relations: ["grade", "grade.school", "orders"]
                 })
 
                 if (!student) throw new Error("学生不存在，请检查身份证号")
@@ -183,7 +196,7 @@ export class OrderController {
                 }
 
                 // 2. Fetch School Products
-                const schoolId = student.class.schoolId
+                const schoolId = student.grade.schoolId
                 const products = await transactionalEntityManager.find(Product, { where: { schoolId } })
                 const productMap = new Map<number, Product>()
                 products.forEach(p => productMap.set(p.type, p))
@@ -241,7 +254,7 @@ export class OrderController {
                 // 1. Fetch Order with Relations
                 const order = await transactionalEntityManager.findOne(Order, {
                     where: { id },
-                    relations: ["student", "student.class", "items", "items.product"]
+                    relations: ["student", "student.grade", "items", "items.product"]
                 })
 
                 if (!order) throw new Error("Order not found")
@@ -263,7 +276,7 @@ export class OrderController {
                 if (order.status === OrderStatus.PAID) {
                     // --- CASE: Supplementary Order for PAID Order ---
 
-                    const schoolId = order.student.class.schoolId
+                    const schoolId = order.student.grade.schoolId
                     const schoolProducts = await transactionalEntityManager.find(Product, { where: { schoolId } })
                     const productMap = new Map<number, Product>()
                     schoolProducts.forEach(p => productMap.set(p.type, p))
@@ -330,7 +343,7 @@ export class OrderController {
                 } else if (order.status === OrderStatus.PENDING) {
                     // --- CASE: Standard Editing for PENDING Order ---
 
-                    const schoolId = order.student.class.schoolId
+                    const schoolId = order.student.grade.schoolId
                     const schoolProducts = await transactionalEntityManager.find(Product, { where: { schoolId } })
                     const productMap = new Map<number, Product>()
                     schoolProducts.forEach(p => productMap.set(p.type, p))

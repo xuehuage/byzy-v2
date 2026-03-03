@@ -65,9 +65,9 @@ export default function QueryResultsPage({ params }: { params: Promise<{ schoolI
                                         <div>
                                             <div className="text-white font-black text-xl tracking-tight">{s.student.name}</div>
                                             <div className="text-white/70 text-xs font-medium mt-0.5">
-                                                {s.student.class_name && s.student.class_name !== '未分班'
+                                                {s.student.grade_name || ''} {s.student.class_name && s.student.class_name !== '未分班'
                                                     ? s.student.class_name
-                                                    : '未分班'}
+                                                    : (s.student.grade_name ? '' : '未分班')}
                                             </div>
                                         </div>
                                     </div>
@@ -89,10 +89,10 @@ export default function QueryResultsPage({ params }: { params: Promise<{ schoolI
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">已付款</div>
+                                        {/* <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">已付款</div>
                                         <div className="text-2xl font-black text-green-600">
                                             {getPaidCount(s.orders)}<span className="text-xs font-medium text-gray-400">/{s.orders.length}</span>
-                                        </div>
+                                        </div> */}
                                     </div>
                                 </div>
                             </div>

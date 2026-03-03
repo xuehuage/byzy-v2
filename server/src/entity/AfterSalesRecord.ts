@@ -45,6 +45,15 @@ export class AfterSalesRecord {
     @Column({ name: 'new_size', type: "varchar", length: 50, nullable: true })
     newSize!: string | null
 
+    @Column({ name: 'is_special_size', type: 'tinyint', default: 0 })
+    isSpecialSize!: boolean
+
+    @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+    height!: number | null
+
+    @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+    weight!: number | null
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date
 

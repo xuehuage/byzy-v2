@@ -214,7 +214,7 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
 
                 // Calculate current total for unpaid items (in Yuan)
                 const currentUnpaidTotalYuan = tempOrderId
-                    ? Number(orderDetailRes.data.total_amount)
+                    ? (Number(orderDetailRes.data.total_amount) > 1000 ? Number(orderDetailRes.data.total_amount) / 100 : Number(orderDetailRes.data.total_amount))
                     : freshOrders
                         .filter((o: any) => o.payment_status === 0)
                         .reduce((sum: number, o: any) => sum + (Number(o.total_amount) / 100), 0);

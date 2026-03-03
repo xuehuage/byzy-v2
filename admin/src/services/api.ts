@@ -18,7 +18,7 @@ export interface ExportRow {
     studentName: string
     idCard: string
     summerQty: number
-    springQty: number
+    autumnQty: number
     winterQty: number
     totalAmount: number
     status: string
@@ -40,9 +40,9 @@ export const exportSchoolData = (schoolId: number) => {
     return request.get<ApiResponse<ExportRow[]>>(`/schools/${schoolId}/export`)
 }
 
-export const getClassList = (schoolId: number) => {
+export const getClassList = (params: { schoolId?: number, gradeId?: number }) => {
     return request.get<ApiResponse<ClassEntity[]>>('/classes', {
-        params: { schoolId }
+        params
     })
 }
 
@@ -56,7 +56,7 @@ export const updateOrder = (data: OrderUIItem) => {
     return request.put<ApiResponse<any>>(`/orders/${data.id}`, data)
 }
 
-export const createSupplementaryOrder = (data: { idCard: string, summerQty: number, springQty: number, winterQty: number }) => {
+export const createSupplementaryOrder = (data: { idCard: string, summerQty: number, autumnQty: number, winterQty: number }) => {
     return request.post<ApiResponse<any>>('/orders/supplementary', data)
 }
 
@@ -92,11 +92,11 @@ export const rejectAfterSales = (id: number, reason: string) => {
     return request.put<ApiResponse<any>>(`/after-sales/${id}/reject`, { reason })
 }
 
-export const batchCreateSchool = (data: { name: string, classes: string[] }) => {
+export const batchCreateSchool = (data: { name: string, grades: { name: string, classes: string[] }[] }) => {
     return request.post<ApiResponse<any>>('/schools/batch', data)
 }
 
-export const batchUpdateSchool = (id: number, data: { name: string, classes: string[] }) => {
+export const batchUpdateSchool = (id: number, data: { name: string, grades: { name: string, classes: string[] }[] }) => {
     return request.put<ApiResponse<any>>(`/schools/${id}/batch`, data)
 }
 

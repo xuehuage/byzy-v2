@@ -11,6 +11,12 @@ export class OrderTemp {
     @Column({ name: 'school_id' })
     schoolId!: number
 
+    @Column({ name: 'grade_id', type: "int", nullable: true })
+    gradeId!: number | null
+
+    @Column({ name: 'class_id', type: "int", nullable: true })
+    classId!: number | null
+
     @Column({ name: 'student_name' })
     studentName!: string
 

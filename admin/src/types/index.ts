@@ -3,7 +3,7 @@ export interface StudentData {
     studentName: string
     idCard: string
     summerQty: number
-    springQty: number
+    autumnQty: number
     winterQty: number
 }
 
@@ -38,6 +38,9 @@ export interface AfterSalesRecord {
     originalSize: string
     newQuantity: number
     newSize: string | null
+    isSpecialSize: boolean
+    height: number | null
+    weight: number | null
     createdAt: string
     order?: Order
 }
@@ -58,7 +61,7 @@ export interface SchoolStats {
     createdAt: string
     studentCount: number
     summerQty: number
-    springQty: number
+    autumnQty: number
     winterQty: number
     totalRevenue: number
     paidAmount: number
@@ -80,14 +83,22 @@ export interface School {
     name: string
     status: number
     createdAt: string
-    classes?: ClassEntity[]
+    grades?: Grade[]
     updatedAt: string
+    studentCount?: number
+}
+
+export interface Grade {
+    id: number
+    schoolId: number
+    name: string
+    classes?: ClassEntity[]
     studentCount?: number
 }
 
 export interface ClassEntity {
     id: number
-    schoolId: number
+    gradeId: number
     name: string
     createdAt: string
     studentCount?: number
@@ -120,6 +131,7 @@ export interface OrderSearchParams {
     page: number
     pageSize: number
     schoolId?: number
+    gradeId?: number
     classId?: number
     status?: string
     keyword?: string
@@ -128,7 +140,7 @@ export interface OrderSearchParams {
 export interface OrderSummary {
     totalRevenue: number
     summerQty: number
-    springQty: number
+    autumnQty: number
     winterQty: number
     schoolName?: string
     className?: string
@@ -147,6 +159,6 @@ export interface OrderUIItem extends Order {
     className: string
     studentName: string
     summerQty: number
-    springQty: number
+    autumnQty: number
     winterQty: number
 }

@@ -10,7 +10,10 @@ import {
     Picker,
     Stepper,
     Image,
-    Divider
+    Divider,
+    Popup,
+    Radio,
+    Space
 } from 'antd-mobile';
 import {
     InfoCircleOutlined,
@@ -37,6 +40,8 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
     const name = searchParams.get('name') || '';
     const phone = searchParams.get('phone') || '';
     const birthday = searchParams.get('birthday') || '';
+    const gradeId = searchParams.get('gradeId') || '';
+    const classId = searchParams.get('classId') || '';
 
     const [schoolConfig, setSchoolConfig] = useState<any>(null);
     const [selectedItems, setSelectedItems] = useState<any[]>([]);
@@ -44,6 +49,7 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
     const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
     const [activePicker, setActivePicker] = useState<number | null>(null);
     const [paymentMethod, setPaymentMethod] = useState<'2' | '3'>('3'); // '2'=Alipay, '3'=WeChat
+    const [isPaymentPopupOpen, setIsPaymentPopupOpen] = useState(false);
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -83,7 +89,7 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
         return selectedItems.reduce((acc, i) => acc + i.price * i.quantity, 0) / 100;
     };
 
-    const handleSubmit = async () => {
+    const handleOrderNow = () => {
         const validItems = selectedItems.filter(i => i.quantity > 0);
 
         if (validItems.length === 0) {
@@ -95,16 +101,23 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
         for (const item of validItems) {
             if (item.isSpecialSize) {
                 if (!item.height || !item.weight) {
-                    message.warning('由于您选择了特殊尺码，请填写具体的身高和体重信息');
+                    message.warning('由于您选择了具体的身高和体重信息');
                     return;
                 }
             }
         }
 
+        setIsPaymentPopupOpen(true);
+    };
+
+    const handleFinalSubmit = async () => {
+        const validItems = selectedItems.filter(i => i.quantity > 0);
         setLoading(true);
         try {
             const payload = {
                 schoolId: Number(schoolId),
+                gradeId: gradeId ? Number(gradeId) : undefined,
+                classId: classId ? Number(classId) : undefined,
                 name,
                 phone,
                 birthday,
@@ -301,6 +314,25 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
                                 <Text type="secondary" className="font-medium">当前校园店暂无可订购款式</Text>
                             </div>
                         )}
+
+                        {(schoolConfig.isSummerActive || schoolConfig.isAutumnActive || schoolConfig.isWinterActive) && (
+                            <div className="mt-12 px-2">
+                                <Button
+                                    type="primary"
+                                    block
+                                    size="large"
+                                    onClick={handleOrderNow}
+                                    className="h-16 rounded-[1.25rem] font-black text-xl border-none bg-blue-600 shadow-2xl shadow-blue-400/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                >
+                                    立即下单
+                                </Button>
+                                <div className="mt-4 text-center">
+                                    <Text type="secondary" style={{ fontSize: '11px' }} className="font-bold text-gray-400 uppercase tracking-widest">
+                                        支持多种支付方式 · 安全加密 · 极速配送
+                                    </Text>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="py-20 text-center flex flex-col items-center gap-2">
@@ -310,58 +342,84 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
                 )}
             </main>
 
-            {/* Bottom Floating Bar */}
-            <div className={`fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl border-t px-6 py-4 ring-1 ring-black/5 shadow-[0_-20px_50px_rgba(0,0,0,0.08)] z-20 transition-all duration-700 ${selectedItems.length > 0 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
-
-                {/* Payment Method Selector */}
-                <div className="flex items-center gap-3 mb-4">
-                    <span className="text-gray-400 text-xs font-bold uppercase tracking-widest whitespace-nowrap">支付方式</span>
-                    <div className="flex gap-2 flex-1">
-                        <button
-                            type="button"
-                            onClick={() => setPaymentMethod('3')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-[1rem] border-2 text-sm font-bold transition-all ${paymentMethod === '3'
-                                ? 'border-green-500 bg-green-50 text-green-700 shadow-sm shadow-green-200'
-                                : 'border-gray-200 text-gray-400 hover:border-green-300 hover:text-green-600'
-                                }`}
-                        >
-                            <img src="/icons/wechat-pay.svg" alt="微信支付" className="w-5 h-5" />
-                            微信支付
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setPaymentMethod('2')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-[1rem] border-2 text-sm font-bold transition-all ${paymentMethod === '2'
-                                ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm shadow-blue-200'
-                                : 'border-gray-200 text-gray-400 hover:border-blue-300 hover:text-blue-600'
-                                }`}
-                        >
-                            <img src="/icons/alipay.svg" alt="支付宝" className="w-5 h-5" />
-                            支付宝
-                        </button>
-                    </div>
+            {/* Hidden Bottom Floating Bar (Replaced by Popup and Bottom Button) */}
+            {false && (
+                <div className={`fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-2xl border-t px-6 py-4 ring-1 ring-black/5 shadow-[0_-20px_50px_rgba(0,0,0,0.08)] z-20 transition-all duration-700 ${selectedItems.length > 0 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
+                    {/* Previous Bottom Bar Content */}
                 </div>
+            )}
 
-                {/* Total + Submit Row */}
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                        <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">应付总计</span>
-                        <div className="text-3xl font-black text-red-500 tracking-tighter flex items-end">
-                            <span className="text-sm mb-1 mr-0.5 font-bold">￥</span>
-                            {calculateTotal().toFixed(0)}
+            {/* Payment Selection Popup */}
+            <Popup
+                visible={isPaymentPopupOpen}
+                onMaskClick={() => setIsPaymentPopupOpen(false)}
+                onClose={() => setIsPaymentPopupOpen(false)}
+                bodyStyle={{
+                    borderTopLeftRadius: '2rem',
+                    borderTopRightRadius: '2rem',
+                    minHeight: '40vh',
+                }}
+            >
+                <div className="p-8 font-sans">
+                    <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-8"></div>
+
+                    <div className="space-y-6 mb-10">
+
+                        <div className="space-y-3">
+                            <span className="text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] ml-2">支付方式</span>
+                            <Radio.Group
+                                value={paymentMethod}
+                                onChange={val => setPaymentMethod(val as any)}
+                            >
+                                <Space direction='vertical' block className="w-full">
+                                    <div
+                                        onClick={() => setPaymentMethod('3')}
+                                        className={`flex items-center justify-between p-5 rounded-[1.25rem] border-2 transition-all cursor-pointer ${paymentMethod === '3' ? 'border-green-500 bg-green-50/50' : 'border-gray-50 bg-gray-50/30 grayscale opacity-60'}`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center p-2">
+                                                <img src="/icons/wechat-pay.svg" alt="微信支付" className="w-full h-full" />
+                                            </div>
+                                            <div>
+                                                <div className="font-black text-gray-800">微信支付</div>
+                                                <div className="text-[10px] text-gray-400 font-bold uppercase">Safe & Faster</div>
+                                            </div>
+                                        </div>
+                                        <Radio value='3' />
+                                    </div>
+
+                                    <div
+                                        onClick={() => setPaymentMethod('2')}
+                                        className={`flex items-center justify-between p-5 rounded-[1.25rem] border-2 transition-all cursor-pointer ${paymentMethod === '2' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-50 bg-gray-50/30 grayscale opacity-60'}`}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center p-2">
+                                                <img src="/icons/alipay.svg" alt="支付宝" className="w-full h-full" />
+                                            </div>
+                                            <div>
+                                                <div className="font-black text-gray-800">支付宝</div>
+                                                <div className="text-[10px] text-gray-400 font-bold uppercase">Official Payment</div>
+                                            </div>
+                                        </div>
+                                        <Radio value='2' />
+                                    </div>
+                                </Space>
+                            </Radio.Group>
                         </div>
                     </div>
+
                     <Button
                         type="primary"
+                        block
                         size="large"
                         loading={loading}
-                        onClick={handleSubmit}
-                        className="h-16 px-10 rounded-[1.25rem] font-black text-lg border-none bg-blue-600 shadow-2xl shadow-blue-400/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        onClick={handleFinalSubmit}
+                        className="h-16 rounded-2xl font-black text-xl border-none bg-blue-600 shadow-xl shadow-blue-400/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
                     >
-                        立即下单
+                        去支付
                     </Button>
                 </div>
-            </div>
+            </Popup>
 
             {/* Size Guide Modal */}
             <Modal

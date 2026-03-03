@@ -18,6 +18,7 @@ const OrderList: React.FC = () => {
     const [editForm] = Form.useForm()
     const [schools, setSchools] = useState<School[]>([])
     const [selectedSchool, setSelectedSchool] = useState<School | null>(null)
+    const [selectedGrade, setSelectedGrade] = useState<any | null>(null)
     const [loading, setLoading] = useState(false)
     const [orderList, setOrderList] = useState<OrderUIItem[]>([])
     const [total, setTotal] = useState(0)
@@ -48,9 +49,14 @@ const OrderList: React.FC = () => {
     }
 
     const fetchOrders = async (values?: any) => {
+        const currentValues = values || form.getFieldsValue()
+        if (!currentValues.schoolId || currentValues.schoolId === 'all') {
+            setOrderList([])
+            setTotal(0)
+            return
+        }
         setLoading(true)
         try {
-            const currentValues = values || form.getFieldsValue()
             const params = {
                 page: pagination.page,
                 pageSize: pagination.pageSize,
@@ -84,9 +90,21 @@ const OrderList: React.FC = () => {
     const handleSchoolChange = (value: number | string) => {
         if (value === 'all') {
             setSelectedSchool(null)
+            setSelectedGrade(null)
         } else {
             const school = schools.find(s => s.id === value)
             setSelectedSchool(school || null)
+            setSelectedGrade(null)
+        }
+        form.setFieldsValue({ gradeId: 'all', classId: 'all' })
+    }
+
+    const handleGradeChange = (value: number | string) => {
+        if (value === 'all') {
+            setSelectedGrade(null)
+        } else {
+            const grade = selectedSchool?.grades?.find(g => g.id === value)
+            setSelectedGrade(grade || null)
         }
         form.setFieldsValue({ classId: 'all' })
     }
@@ -103,6 +121,7 @@ const OrderList: React.FC = () => {
     const handleReset = () => {
         form.resetFields()
         setSelectedSchool(null)
+        setSelectedGrade(null)
         setOrderList([])
         setTotal(0)
         setPagination({ ...pagination, page: 1 })
@@ -114,7 +133,7 @@ const OrderList: React.FC = () => {
             name: record.studentName,
             idCard: record.student?.idCard,
             summerQty: record.summerQty,
-            springQty: record.springQty,
+            autumnQty: record.autumnQty,
             winterQty: record.winterQty,
             id: record.id
         })
@@ -164,7 +183,7 @@ const OrderList: React.FC = () => {
             const res = await createSupplementaryOrder({
                 idCard: values.idCard,
                 summerQty: values.summerQty || 0,
-                springQty: values.springQty || 0,
+                autumnQty: values.autumnQty || 0,
                 winterQty: values.winterQty || 0
             })
 
@@ -220,9 +239,9 @@ const OrderList: React.FC = () => {
             render: (val) => val || 0
         },
         {
-            title: '春秋装套数',
-            dataIndex: 'springQty',
-            key: 'springQty',
+            title: '秋装套数',
+            dataIndex: 'autumnQty',
+            key: 'autumnQty',
             align: 'center',
             render: (val) => val || 0
         },
@@ -305,7 +324,7 @@ const OrderList: React.FC = () => {
             {/* Filter Section */}
             <Card bordered={false} className="shadow-sm rounded-lg">
                 <Form form={form} onFinish={handleSearch} initialValues={{ schoolId: 'all', classId: 'all', uniformType: 'all', status: 'all' }}>
-                    <div className="grid grid-cols-3 gap-x-8 gap-y-6">
+                    <div className="grid grid-cols-4 gap-x-8 gap-y-6">
                         {/* Row 1 */}
                         <Form.Item label="学校" name="schoolId" className="mb-0 w-full">
                             <Select
@@ -320,14 +339,28 @@ const OrderList: React.FC = () => {
                             </Select>
                         </Form.Item>
 
-                        <Form.Item label="班级" name="classId" className="mb-0 w-full">
+                        <Form.Item label="年级" name="gradeId" className="mb-0 w-full">
                             <Select
-                                placeholder="选择班级"
+                                placeholder="选择年级"
                                 disabled={!selectedSchool}
+                                onChange={handleGradeChange}
                                 className="w-full"
                             >
                                 <Option key="all" value="all">全部</Option>
-                                {selectedSchool?.classes?.map(cls => (
+                                {(selectedSchool?.grades || []).map(grade => (
+                                    <Option key={grade.id} value={grade.id}>{grade.name}</Option>
+                                ))}
+                            </Select>
+                        </Form.Item>
+
+                        <Form.Item label="班级" name="classId" className="mb-0 w-full">
+                            <Select
+                                placeholder="选择班级"
+                                disabled={!selectedGrade}
+                                className="w-full"
+                            >
+                                <Option key="all" value="all">全部</Option>
+                                {(selectedGrade?.classes || []).map((cls: any) => (
                                     <Option key={cls.id} value={cls.id}>{cls.name}</Option>
                                 ))}
                             </Select>
@@ -426,8 +459,8 @@ const OrderList: React.FC = () => {
                             <InputNumber min={0} className="w-full" precision={0} />
                         </Form.Item>
                         <Form.Item
-                            name="springQty"
-                            label="春秋装套数"
+                            name="autumnQty"
+                            label="秋装套数"
                             initialValue={0}
                         >
                             <InputNumber min={0} className="w-full" precision={0} />
@@ -483,8 +516,8 @@ const OrderList: React.FC = () => {
                             <InputNumber min={0} className="w-full" precision={0} />
                         </Form.Item>
                         <Form.Item
-                            name="springQty"
-                            label="新增春秋"
+                            name="autumnQty"
+                            label="新增秋装"
                             initialValue={0}
                         >
                             <InputNumber min={0} className="w-full" precision={0} />

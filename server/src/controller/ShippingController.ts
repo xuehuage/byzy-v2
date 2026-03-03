@@ -33,8 +33,8 @@ export class ShippingController {
                 const orders = await AppDataSource.getRepository(Order)
                     .createQueryBuilder('order')
                     .innerJoin('order.student', 'student')
-                    .innerJoin('student.class', 'class')
-                    .innerJoin('class.school', 'school')
+                    .innerJoin('student.grade', 'grade')
+                    .innerJoin('grade.school', 'school')
                     .innerJoinAndSelect('order.items', 'item')
                     .innerJoinAndSelect('item.product', 'product')
                     .where('school.id = :schoolId', { schoolId: school.id })
@@ -84,12 +84,13 @@ export class ShippingController {
             const orders = await AppDataSource.getRepository(Order)
                 .createQueryBuilder('order')
                 .innerJoinAndSelect('order.student', 'student')
+                .leftJoinAndSelect('student.grade', 'grade')
                 .leftJoinAndSelect('student.class', 'class')
                 .innerJoinAndSelect('order.items', 'item')
                 .innerJoinAndSelect('item.product', 'product')
                 .leftJoinAndSelect('order.afterSales', 'asr', 'asr.type = :type AND asr.status = :asrStatus', { type: AfterSalesType.EXCHANGE, asrStatus: AfterSalesStatus.PENDING })
-                .innerJoin('student.class', 'cls')
-                .innerJoin('cls.school', 'school')
+                .innerJoin('student.grade', 'g')
+                .innerJoin('g.school', 'school')
                 .where('school.id = :schoolId', { schoolId })
                 .andWhere('order.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING] })
                 .orderBy('class.name', 'ASC')
@@ -104,6 +105,7 @@ export class ShippingController {
                     return {
                         orderNo: order.orderNo,
                         studentName: order.student?.name || '',
+                        gradeName: order.student?.grade?.name || '未设年级',
                         className: order.student?.class?.name || '未分班',
                         birthday: order.student?.birthday || '',
                         productType: productTypeNames[item.product?.type] || '校服',
@@ -140,8 +142,8 @@ export class ShippingController {
                     .createQueryBuilder('o')
                     .select('o.id')
                     .innerJoin('o.student', 's')
-                    .innerJoin('s.class', 'c')
-                    .where('c.school_id = :schoolId', { schoolId })
+                    .innerJoin('s.grade', 'g')
+                    .where('g.school_id = :schoolId', { schoolId })
                     .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING] })
 
                 const rawOrders = await subQuery.getMany()

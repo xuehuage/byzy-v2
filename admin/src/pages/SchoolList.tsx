@@ -71,7 +71,7 @@ const SchoolList: React.FC = () => {
         // Mock default values for pricing
         editForm.setFieldsValue({
             priceSummer: 100,
-            priceSpring: 150,
+            priceAutumn: 150,
             priceWinter: 200,
         })
         setIsEditModalOpen(true)
@@ -141,7 +141,7 @@ const SchoolList: React.FC = () => {
                     { header: '姓名', key: 'studentName', width: 15 },
                     { header: '身份证号', key: 'idCard', width: 25 },
                     { header: '夏装订购套数', key: 'summerQty', width: 15 },
-                    { header: '春秋装订购套数', key: 'springQty', width: 15 },
+                    { header: '秋装订购套数', key: 'autumnQty', width: 15 },
                     { header: '冬装订购套数', key: 'winterQty', width: 15 },
                     { header: '订单总金额', key: 'totalAmount', width: 15 },
                     { header: '付款状态', key: 'status', width: 15 }
@@ -208,9 +208,9 @@ const SchoolList: React.FC = () => {
             align: 'right',
         },
         {
-            title: '春秋装套数',
-            dataIndex: 'springQty',
-            key: 'springQty',
+            title: '秋装套数',
+            dataIndex: 'autumnQty',
+            key: 'autumnQty',
             width: 110,
             align: 'right',
         },
@@ -350,7 +350,7 @@ const SchoolList: React.FC = () => {
                             </Form.Item>
                         </Col>
                         <Col span={8}>
-                            <Form.Item name="priceSpring" label="春秋装" rules={[{ required: true }]}>
+                            <Form.Item name="priceAutumn" label="秋装" rules={[{ required: true }]}>
                                 <InputNumber prefix="¥" style={{ width: '100%' }} min={0} />
                             </Form.Item>
                         </Col>
