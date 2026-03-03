@@ -8,6 +8,7 @@ import {
     UserOutlined,
     LogoutOutlined,
     DatabaseOutlined,
+    TruckOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../store/authStore'
 
@@ -31,27 +32,59 @@ const AdminLayout: React.FC = () => {
         {
             key: '/',
             icon: <DashboardOutlined />,
-            label: 'dashboard',
+            label: '数据概览',
             onClick: () => navigate('/'),
         },
+        // --- V2 Navigation ---
         {
-            key: '/schools',
+            key: '/school-mgmt',
             icon: <HomeOutlined />,
-            label: '学校列表',
-            onClick: () => navigate('/schools'),
+            label: '学校与名单管理',
+            onClick: () => navigate('/school-mgmt'),
         },
         {
-            key: '/orders',
+            key: '/product-config',
+            icon: <DatabaseOutlined />,
+            label: '商品配置中心',
+            onClick: () => navigate('/product-config'),
+        },
+        {
+            key: '/order-center',
             icon: <ShoppingOutlined />,
             label: '订单管理',
-            onClick: () => navigate('/orders'),
+            onClick: () => navigate('/order-center'),
         },
         {
-            key: '/import',
-            icon: <DatabaseOutlined />,
-            label: '数据导入',
-            onClick: () => navigate('/import'),
+            key: '/shipping-mgmt',
+            icon: <TruckOutlined />,
+            label: '发货管理',
+            onClick: () => navigate('/shipping-mgmt'),
         },
+        {
+            key: '/after-sales',
+            icon: <UserOutlined />, // Just a placeholder icon
+            label: '售后服务中心',
+            onClick: () => navigate('/after-sales'),
+        },
+        // --- V1 Navigation (Preserved) ---
+        // {
+        //     key: '/schools',
+        //     icon: <HomeOutlined />,
+        //     label: '学校列表 (V1)',
+        //     onClick: () => navigate('/schools'),
+        // },
+        // {
+        //     key: '/orders',
+        //     icon: <ShoppingOutlined />,
+        //     label: '订单管理 (V1)',
+        //     onClick: () => navigate('/orders'),
+        // },
+        // {
+        //     key: '/import',
+        //     icon: <DatabaseOutlined />,
+        //     label: '数据导入 (V1)',
+        //     onClick: () => navigate('/import'),
+        // },
     ]
 
     const userMenu = {

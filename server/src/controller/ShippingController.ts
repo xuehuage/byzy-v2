@@ -1,0 +1,174 @@
+import { Request, Response } from "express"
+import { AppDataSource } from "../data-source"
+import { In } from "typeorm"
+import { Order, OrderStatus } from "../entity/Order"
+import { School } from "../entity/School"
+import { Student } from "../entity/Student"
+import { AfterSalesRecord, AfterSalesType, AfterSalesStatus } from "../entity/AfterSalesRecord"
+
+// Product type → 中文名称
+const productTypeNames: Record<number, string> = { 0: '夏装', 1: '春秋装', 2: '冬装' }
+
+export class ShippingController {
+    /**
+     * 获取发货统计（按学校汇总）
+     * GET /shipping/stats?schoolName=xxx
+     */
+    static async getStats(req: Request, res: Response) {
+        try {
+            const { schoolName } = req.query
+
+            // 1. 获取所有学校列表（支持筛选）
+            const schoolRepo = AppDataSource.getRepository(School)
+            let schoolQb = schoolRepo.createQueryBuilder('school')
+            if (schoolName) {
+                schoolQb = schoolQb.where('school.name LIKE :name', { name: `%${schoolName}%` })
+            }
+            const schools = await schoolQb.getMany()
+
+            // 2. 对每个学校统计已支付（PAID）且未发货的订单
+            const result = []
+            for (const school of schools) {
+                // 查找该学校的所有已支付未发货订单
+                const orders = await AppDataSource.getRepository(Order)
+                    .createQueryBuilder('order')
+                    .innerJoin('order.student', 'student')
+                    .innerJoin('student.class', 'class')
+                    .innerJoin('class.school', 'school')
+                    .innerJoinAndSelect('order.items', 'item')
+                    .innerJoinAndSelect('item.product', 'product')
+                    .where('school.id = :schoolId', { schoolId: school.id })
+                    .andWhere('order.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING] })
+                    .getMany()
+
+                if (orders.length === 0) continue // 无待发货订单则跳过
+
+                // 汇总套数
+                const qtySummary: Record<number, number> = {}
+                for (const order of orders) {
+                    for (const item of order.items) {
+                        const t = item.product?.type ?? -1
+                        qtySummary[t] = (qtySummary[t] || 0) + item.quantity
+                    }
+                }
+
+                const qtyText = Object.entries(qtySummary)
+                    .filter(([type]) => productTypeNames[Number(type)])
+                    .map(([type, qty]) => `${productTypeNames[Number(type)]}${qty}套`)
+                    .join('；') || '—'
+
+                result.push({
+                    schoolId: school.id,
+                    schoolName: school.name,
+                    pendingOrderCount: orders.length,
+                    qtySummary: qtyText,
+                })
+            }
+
+            return res.json({ code: 200, data: result })
+        } catch (error) {
+            console.error('ShippingController.getStats error:', error)
+            return res.status(500).json({ code: 500, message: 'Internal server error' })
+        }
+    }
+
+    /**
+     * 导出发货单（当前学校已付款所有学生信息）
+     * GET /shipping/:schoolId/export
+     * Returns JSON array; frontend will convert to Excel/download
+     */
+    static async exportManifest(req: Request, res: Response) {
+        try {
+            const schoolId = parseInt(req.params.schoolId)
+
+            const orders = await AppDataSource.getRepository(Order)
+                .createQueryBuilder('order')
+                .innerJoinAndSelect('order.student', 'student')
+                .leftJoinAndSelect('student.class', 'class')
+                .innerJoinAndSelect('order.items', 'item')
+                .innerJoinAndSelect('item.product', 'product')
+                .leftJoinAndSelect('order.afterSales', 'asr', 'asr.type = :type AND asr.status = :asrStatus', { type: AfterSalesType.EXCHANGE, asrStatus: AfterSalesStatus.PENDING })
+                .innerJoin('student.class', 'cls')
+                .innerJoin('cls.school', 'school')
+                .where('school.id = :schoolId', { schoolId })
+                .andWhere('order.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING] })
+                .orderBy('class.name', 'ASC')
+                .addOrderBy('student.name', 'ASC')
+                .getMany()
+
+            const rows = orders.flatMap(order => {
+                const asr = (order as any).afterSales?.[0] as AfterSalesRecord | undefined
+
+                return order.items.map(item => {
+                    const isExchanging = order.status === OrderStatus.EXCHANGING
+                    return {
+                        orderNo: order.orderNo,
+                        studentName: order.student?.name || '',
+                        className: order.student?.class?.name || '未分班',
+                        birthday: order.student?.birthday || '',
+                        productType: productTypeNames[item.product?.type] || '校服',
+                        // If exchanging, use new size; otherwise use original
+                        size: (isExchanging && asr?.newSize) ? asr.newSize : (item.size || '—'),
+                        isSpecialSize: item.isSpecialSize ? '是' : '否',
+                        height: item.height || '',
+                        weight: item.weight || '',
+                        // If exchanging, use new quantity; otherwise use original
+                        quantity: (isExchanging && asr?.newQuantity !== undefined) ? asr.newQuantity : item.quantity,
+                        totalAmount: (order.totalAmount / 100).toFixed(2),
+                        status: isExchanging ? '调换' : '增订'
+                    }
+                })
+            })
+
+            return res.json({ code: 200, data: rows })
+        } catch (error) {
+            console.error('ShippingController.exportManifest error:', error)
+            return res.status(500).json({ code: 500, message: 'Internal server error' })
+        }
+    }
+
+    /**
+     * 确认发货（将当前学校所有已付款订单改为已发货）
+     * POST /shipping/:schoolId/confirm
+     */
+    static async confirmShip(req: Request, res: Response) {
+        try {
+            const schoolId = parseInt(req.params.schoolId)
+
+            const updatedCount = await AppDataSource.manager.transaction(async (manager) => {
+                const subQuery = manager.getRepository(Order)
+                    .createQueryBuilder('o')
+                    .select('o.id')
+                    .innerJoin('o.student', 's')
+                    .innerJoin('s.class', 'c')
+                    .where('c.school_id = :schoolId', { schoolId })
+                    .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING] })
+
+                const rawOrders = await subQuery.getMany()
+                const orderIds = rawOrders.map(o => o.id)
+
+                if (orderIds.length === 0) return 0
+
+                // 1. Update orders to SHIPPED
+                await manager.getRepository(Order).update(orderIds, { status: OrderStatus.SHIPPED })
+
+                // 2. Mark pending Exchange records as PROCESSED
+                await manager.getRepository(AfterSalesRecord).update(
+                    { orderId: In(orderIds), type: AfterSalesType.EXCHANGE, status: AfterSalesStatus.PENDING },
+                    { status: AfterSalesStatus.PROCESSED }
+                )
+
+                return orderIds.length
+            })
+
+            return res.json({
+                code: 200,
+                message: '发货成功',
+                data: { updatedCount }
+            })
+        } catch (error) {
+            console.error('ShippingController.confirmShip error:', error)
+            return res.status(500).json({ code: 500, message: 'Internal server error' })
+        }
+    }
+}

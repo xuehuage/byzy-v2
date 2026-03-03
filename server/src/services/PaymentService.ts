@@ -132,4 +132,18 @@ fwIDAQAB
 
         return this.requestThirdParty('/upay/v2/query', payload, terminal.terminalSn, terminal.terminalKey)
     }
+
+    static async refund(params: { clientSn: string; refundAmount: number; refundRequestNo: string }) {
+        const terminal = await this.getTerminal();
+
+        const payload = {
+            terminal_sn: terminal.terminalSn,
+            client_sn: params.clientSn,
+            refund_request_no: params.refundRequestNo,
+            operator: 'byzy_admin',
+            refund_amount: params.refundAmount.toString()
+        }
+
+        return this.requestThirdParty('/upay/v2/refund', payload, terminal.terminalSn, terminal.terminalKey)
+    }
 }

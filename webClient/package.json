@@ -9,12 +9,12 @@
   },
   "dependencies": {
     "antd": "^5.27.6",
+    "antd-mobile": "^5.42.3",
     "axios": "^1.12.2",
     "next": "15.5.7",
     "qrcode.react": "^4.2.0",
     "react": "19.2.2",
     "react-dom": "19.2.2"
-   
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

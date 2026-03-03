@@ -12,14 +12,12 @@ export class ClassController {
             }
 
             const classRepository = AppDataSource.getRepository(Class)
-            const classes = await classRepository.find({
-                where: {
-                    schoolId: Number(schoolId)
-                },
-                order: {
-                    name: "ASC"
-                }
-            })
+            const classes = await classRepository.createQueryBuilder("class")
+                .loadRelationCountAndMap("class.studentCount", "class.students")
+                .where("class.school_id = :schoolId", { schoolId: Number(schoolId) })
+                .orderBy("class.name", "ASC")
+                .getMany()
+
             res.json({ code: 200, data: classes })
         } catch (error) {
             console.error("Get classes error:", error)

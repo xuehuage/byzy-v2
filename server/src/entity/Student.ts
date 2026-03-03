@@ -1,21 +1,31 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Unique, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm"
 import { Class } from "./Class"
+import { School } from "./School"
 import { Order } from "./Order"
 
 @Entity("students")
-@Unique(["idCard"])
+@Index("UQ_student_identity", ["name", "phone", "birthday", "schoolId"], { unique: true })
 export class Student {
     @PrimaryGeneratedColumn()
     id!: number
 
-    @Column({ name: 'class_id' })
-    classId!: number
+    @Column({ name: 'class_id', type: "int", nullable: true })
+    classId!: number | null
+
+    @Column({ name: 'school_id', type: "int", nullable: true })
+    schoolId!: number | null
 
     @Column()
     name!: string
 
-    @Column({ name: 'id_card' })
-    idCard!: string
+    @Column({ type: "varchar", nullable: true })
+    phone!: string | null
+
+    @Column({ type: "varchar", nullable: true })
+    birthday!: string | null
+
+    @Column({ name: 'id_card', type: "varchar", nullable: true })
+    idCard!: string | null
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date
@@ -26,6 +36,10 @@ export class Student {
     @ManyToOne(() => Class, (cls) => cls.students)
     @JoinColumn({ name: "class_id" })
     class!: Class
+
+    @ManyToOne(() => School)
+    @JoinColumn({ name: "school_id" })
+    school!: School
 
     @OneToMany(() => Order, (order) => order.student)
     orders!: Order[]

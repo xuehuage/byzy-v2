@@ -6,7 +6,9 @@ import type {
     ClassEntity,
     OrderListResponse,
     OrderSearchParams,
-    OrderUIItem
+    OrderUIItem,
+    SchoolConfig,
+    AfterSalesRecord
 } from '../types'
 
 // --- API Methods ---
@@ -30,8 +32,8 @@ export const getSchoolList = () => {
     return request.get<ApiResponse<School[]>>('/schools')
 }
 
-export const getSchoolStats = () => {
-    return request.get<ApiResponse<SchoolStats[]>>('/schools/stats')
+export const getSchoolStats = (params?: { startDate?: string, endDate?: string }) => {
+    return request.get<ApiResponse<SchoolStats[]>>('/schools/stats', { params })
 }
 
 export const exportSchoolData = (schoolId: number) => {
@@ -61,3 +63,48 @@ export const createSupplementaryOrder = (data: { idCard: string, summerQty: numb
 export const deleteOrder = (id: number) => {
     return request.delete<ApiResponse<any>>(`/orders/${id}`)
 }
+
+// --- V2 Admin APIs ---
+
+export const getSchoolConfig = (id: number) => {
+    return request.get<ApiResponse<SchoolConfig>>(`/schools/${id}/config`)
+}
+
+export const updateSchoolConfig = (id: number, data: Partial<SchoolConfig>) => {
+    return request.put<ApiResponse<any>>(`/schools/${id}/config`, data)
+}
+
+export const uploadImage = (formData: FormData) => {
+    return request.post<ApiResponse<{ url: string }>>('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
+}
+
+export const getAfterSalesList = (params: { page: number, pageSize: number, status?: string }) => {
+    return request.get<ApiResponse<{ list: AfterSalesRecord[], total: number }>>('/after-sales', { params })
+}
+
+export const approveAfterSales = (id: number) => {
+    return request.put<ApiResponse<any>>(`/after-sales/${id}/approve`)
+}
+
+export const rejectAfterSales = (id: number, reason: string) => {
+    return request.put<ApiResponse<any>>(`/after-sales/${id}/reject`, { reason })
+}
+
+export const batchCreateSchool = (data: { name: string, classes: string[] }) => {
+    return request.post<ApiResponse<any>>('/schools/batch', data)
+}
+
+export const batchUpdateSchool = (id: number, data: { name: string, classes: string[] }) => {
+    return request.put<ApiResponse<any>>(`/schools/${id}/batch`, data)
+}
+
+export const rosterPreview = (data: { schoolId: number, roster: { studentName: string, className: string }[] }) => {
+    return request.post<ApiResponse<any>>('/import/roster-preview', data)
+}
+
+export const rosterApply = (data: { matches: { studentId: number, classId: number }[] }) => {
+    return request.post<ApiResponse<any>>('/import/roster-apply', data)
+}
+

@@ -21,7 +21,9 @@ export interface ClassInfo {
 export interface Student {
     id: number;
     name: string;
-    id_card: string;
+    phone?: string;
+    birthday?: string;
+    id_card: string | null;
     student_id: string;
     class_id: number;
     gender: number;

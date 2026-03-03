@@ -7,7 +7,9 @@
  * 预支付请求参数类型
  */
 export interface PrepayParams {
-    id_card: string;
+    id_card?: string;
+    student_id?: number;
+    temp_order_id?: number;
     pay_way: string;
 }
 

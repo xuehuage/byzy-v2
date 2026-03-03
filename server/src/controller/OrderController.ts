@@ -19,6 +19,7 @@ export class OrderController {
                 .leftJoinAndSelect("class.school", "school")
                 .leftJoinAndSelect("order.items", "items")
                 .leftJoinAndSelect("items.product", "product")
+                .leftJoinAndSelect("order.afterSales", "afterSales")
                 .orderBy("order.createdAt", "DESC")
                 .skip(skip)
                 .take(take)
@@ -67,11 +68,67 @@ export class OrderController {
                 queryBuilder.andWhere(new Brackets(qb => {
                     qb.where("student.name LIKE :keyword", { keyword: `%${keyword}%` })
                         .orWhere("student.idCard LIKE :keyword", { keyword: `%${keyword}%` })
+                        .orWhere("student.phone LIKE :keyword", { keyword: `%${keyword}%` })
                         .orWhere("order.orderNo LIKE :keyword", { keyword: `%${keyword}%` })
                 }))
             }
 
             const [list, total] = await queryBuilder.getManyAndCount()
+
+            // Aggregation for summary
+            // Create a dedicated summary query with same filters
+            const summaryQuery = AppDataSource.getRepository(Order).createQueryBuilder("order")
+                .leftJoin("order.student", "student")
+                .leftJoin("student.class", "class")
+                .leftJoin("class.school", "school")
+                .leftJoin("order.items", "items")
+                .leftJoin("items.product", "product")
+                .select("SUM(order.totalAmount)", "totalRevenue")
+                .addSelect("SUM(CASE WHEN product.type = 0 THEN items.quantity ELSE 0 END)", "summerQty")
+                .addSelect("SUM(CASE WHEN product.type = 1 THEN items.quantity ELSE 0 END)", "springQty")
+                .addSelect("SUM(CASE WHEN product.type = 2 THEN items.quantity ELSE 0 END)", "winterQty")
+
+            // Apply same filters (could be refactored into a helper function, but let's keep it simple for now)
+            if (schoolId && schoolId !== 'all') summaryQuery.andWhere("school.id = :schoolId", { schoolId })
+            if (classId && classId !== 'all') summaryQuery.andWhere("class.id = :classId", { classId })
+            if (status && status !== 'all') summaryQuery.andWhere("order.status = :status", { status })
+            if (studentName) summaryQuery.andWhere("student.name LIKE :studentName", { studentName: `%${studentName}%` })
+            if (idCard) summaryQuery.andWhere("student.idCard LIKE :idCard", { idCard: `%${idCard}%` })
+            if (keyword) {
+                summaryQuery.andWhere(new Brackets(qb => {
+                    qb.where("student.name LIKE :keyword", { keyword: `%${keyword}%` })
+                        .orWhere("student.idCard LIKE :keyword", { keyword: `%${keyword}%` })
+                        .orWhere("student.phone LIKE :keyword", { keyword: `%${keyword}%` })
+                        .orWhere("order.orderNo LIKE :keyword", { keyword: `%${keyword}%` })
+                }))
+            }
+
+            const rawSummary = await summaryQuery.getRawOne()
+
+            // Get specific names if filtered
+            let schoolName, className, foundStudentName
+            if (schoolId && schoolId !== 'all') {
+                const s = await AppDataSource.getRepository("School").findOneBy({ id: Number(schoolId) }) as any
+                schoolName = s?.name
+            }
+            if (classId && classId !== 'all') {
+                const c = await AppDataSource.getRepository("Class").findOne({ where: { id: Number(classId) }, relations: ["school"] }) as any
+                className = c?.name
+                if (!schoolName) schoolName = c?.school?.name
+            }
+            if (list.length === 1 && keyword) {
+                foundStudentName = list[0].student?.name
+            }
+
+            const summary = {
+                totalRevenue: Number(rawSummary.totalRevenue || 0),
+                summerQty: Number(rawSummary.summerQty || 0),
+                springQty: Number(rawSummary.springQty || 0),
+                winterQty: Number(rawSummary.winterQty || 0),
+                schoolName,
+                className,
+                studentName: foundStudentName
+            }
 
             // Pre-calculate quantities for simpler frontend rendering
             const formattedList = list.map(order => {
@@ -94,7 +151,8 @@ export class OrderController {
                     list: formattedList,
                     total,
                     page: Number(page),
-                    pageSize: Number(pageSize)
+                    pageSize: Number(pageSize),
+                    summary
                 }
             })
         } catch (error: any) {

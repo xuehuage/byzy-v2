@@ -16,6 +16,32 @@ export interface SchoolDataType {
     created_at: string
 }
 
+export interface SchoolConfig {
+    summerImage: string | null
+    autumnImage: string | null
+    winterImage: string | null
+    sizeGuideImage: string | null
+    isSummerActive: boolean
+    isAutumnActive: boolean
+    isWinterActive: boolean
+    summerPrice?: number
+    autumnPrice?: number
+    winterPrice?: number
+}
+
+export interface AfterSalesRecord {
+    id: number
+    orderId: number
+    type: 'EXCHANGE' | 'REFUND'
+    status: 'PENDING' | 'PROCESSED' | 'REJECTED'
+    originalQuantity: number
+    originalSize: string
+    newQuantity: number
+    newSize: string | null
+    createdAt: string
+    order?: Order
+}
+
 // --- API Types ---
 
 // 1. Generic API Response Wrapper
@@ -37,6 +63,16 @@ export interface SchoolStats {
     totalRevenue: number
     paidAmount: number
     unpaidAmount: number
+    summerImage?: string | null
+    autumnImage?: string | null
+    winterImage?: string | null
+    sizeGuideImage?: string | null
+    isSummerActive?: boolean
+    isAutumnActive?: boolean
+    isWinterActive?: boolean
+    summerPrice?: number
+    autumnPrice?: number
+    winterPrice?: number
 }
 
 export interface School {
@@ -46,6 +82,7 @@ export interface School {
     createdAt: string
     classes?: ClassEntity[]
     updatedAt: string
+    studentCount?: number
 }
 
 export interface ClassEntity {
@@ -53,6 +90,7 @@ export interface ClassEntity {
     schoolId: number
     name: string
     createdAt: string
+    studentCount?: number
 }
 
 export interface Order {
@@ -60,12 +98,19 @@ export interface Order {
     studentId: number
     orderNo: string
     totalAmount: number
-    status: 'PENDING' | 'PAID' | 'CANCELLED'
+    status: 'PENDING' | 'PAID' | 'CANCELLED' | 'REFUNDING' | 'REFUNDED'
     createdAt: string
     student?: {
         name: string
         idCard: string
+        class?: {
+            name: string
+            school?: {
+                name: string
+            }
+        }
     }
+    afterSales?: any[]
     items?: any[]
     [key: string]: any
 }
@@ -80,11 +125,22 @@ export interface OrderSearchParams {
     keyword?: string
 }
 
+export interface OrderSummary {
+    totalRevenue: number
+    summerQty: number
+    springQty: number
+    winterQty: number
+    schoolName?: string
+    className?: string
+    studentName?: string
+}
+
 export interface OrderListResponse {
     list: Order[]
     total: number
     page: number
     pageSize: number
+    summary?: OrderSummary
 }
 
 export interface OrderUIItem extends Order {

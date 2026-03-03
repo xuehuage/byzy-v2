@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { fetchPrepay } from '@/api/paymentApi';
 import { PrepayResponse } from '@/types/payment.types';
 import { StudentDetailResponse } from '@/types/student.types';
-import { fetchStudentDetail } from '@/api/studentApi';
+import { fetchStudentDetail, fetchStudentDetailById, fetchTempOrder } from '@/api/studentApi';
 import { usePaymentStatusManager } from '@/hooks/usePaymentStatusManager';
 import PaymentLayout from '@/components/PaymentLayout';
 import PaymentResult from '@/components/PaymentResult';
@@ -19,6 +19,7 @@ interface StoredOrder {
     createdAt: number;
     expiresAt: number;
     studentIdNumber: string;
+    studentId?: number;
 }
 
 export default function SimplePaymentContent({ schoolId }: { schoolId?: string }) {
@@ -28,7 +29,9 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
     // 使用 ref 存储参数，避免 searchParams 变化导致重渲染
     const paymentParamsRef = useRef({
         paymentMethod: searchParams.get('method') || '',
-        studentIdNumber: searchParams.get('id') || ''
+        studentIdNumber: searchParams.get('id') || '',
+        studentId: searchParams.get('studentId') || '',
+        tempOrderId: searchParams.get('tempOrderId') || ''
     });
 
     // 状态管理
@@ -61,7 +64,8 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
         console.log('💰 支付成功处理');
         setOrderStatus('PAID');
         localStorage.removeItem('paymentOrder');
-        localStorage.setItem(`paid_${paymentParamsRef.current.studentIdNumber}`, Date.now().toString());
+        const studentIdKey = paymentParamsRef.current.studentId || paymentParamsRef.current.studentIdNumber;
+        localStorage.setItem(`paid_${studentIdKey}`, Date.now().toString());
     }, []);
 
     // 获取预支付信息
@@ -73,20 +77,30 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
             setLoading(true);
             setError('');
 
-            const { paymentMethod, studentIdNumber } = paymentParamsRef.current;
+            const { paymentMethod, studentIdNumber, studentId, tempOrderId } = paymentParamsRef.current;
 
-            if (!paymentMethod || !studentIdNumber) {
+            if (!paymentMethod || (!studentIdNumber && !studentId && !tempOrderId)) {
                 throw new Error('参数错误，无法进行支付');
             }
 
             // 获取学生详情
-            const studentDetail = await fetchStudentDetail(studentIdNumber);
+            let studentDetail;
+            if (tempOrderId) {
+                studentDetail = await fetchTempOrder(Number(tempOrderId));
+            } else if (studentId) {
+                studentDetail = await fetchStudentDetailById(Number(studentId), Number(schoolId));
+            } else {
+                studentDetail = await fetchStudentDetail(studentIdNumber, Number(schoolId));
+            }
+
             if (!componentMountedRef.current) return;
             setStudentInfo(studentDetail.data.student);
 
             // 获取预支付信息
             const prepayResponse = await fetchPrepay({
-                id_card: studentIdNumber,
+                id_card: studentIdNumber || undefined,
+                student_id: studentId ? Number(studentId) : undefined,
+                temp_order_id: tempOrderId ? Number(tempOrderId) : undefined,
                 pay_way: paymentMethod
             });
 
@@ -99,7 +113,8 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
                 prepayData: prepayResponse.data,
                 createdAt: Date.now(),
                 expiresAt: Date.now() + (PAYMENT_EXPIRY_SECONDS * 1000),
-                studentIdNumber: studentIdNumber
+                studentIdNumber: studentIdNumber,
+                studentId: studentId ? Number(studentId) : undefined
             };
             localStorage.setItem('paymentOrder', JSON.stringify(storedOrder));
 
@@ -136,7 +151,9 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
             const now = Date.now();
 
             // 检查是否过期或学生不匹配
-            if (now > order.expiresAt || order.studentIdNumber !== paymentParamsRef.current.studentIdNumber) {
+            const currentIdKey = paymentParamsRef.current.studentId || paymentParamsRef.current.studentIdNumber;
+            if (now > order.expiresAt ||
+                (order.studentIdNumber !== currentIdKey && order.studentId?.toString() !== currentIdKey)) {
                 localStorage.removeItem('paymentOrder');
                 return null;
             }
@@ -176,21 +193,31 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
             setError('');
 
             try {
-                // 1. MUST fetch fresh student detail first to get latest unpaid orders
-                const studentId = paymentParamsRef.current.studentIdNumber;
-                if (!studentId) throw new Error('未提供学生身份证号');
+                // 1. MUST fetch fresh student detail first
+                const { studentId, studentIdNumber, tempOrderId } = paymentParamsRef.current;
+                if (!studentId && !studentIdNumber && !tempOrderId) throw new Error('未提供学生标识');
 
-                const studentDetailRes = await fetchStudentDetail(studentId);
+                let orderDetailRes;
+                if (tempOrderId) {
+                    orderDetailRes = await fetchTempOrder(Number(tempOrderId));
+                } else if (studentId) {
+                    orderDetailRes = await fetchStudentDetailById(Number(studentId), Number(schoolId));
+                } else {
+                    orderDetailRes = await fetchStudentDetail(studentIdNumber, Number(schoolId));
+                }
+
                 if (!componentMountedRef.current) return;
 
-                const freshStudent = studentDetailRes.data.student;
-                const freshOrders = studentDetailRes.data.orders || [];
+                const freshStudent = orderDetailRes.data.student;
+                const freshOrders = orderDetailRes.data.orders || [];
                 setStudentInfo(freshStudent);
 
                 // Calculate current total for unpaid items (in Yuan)
-                const currentUnpaidTotalYuan = freshOrders
-                    .filter((o: any) => o.payment_status === 0)
-                    .reduce((sum: number, o: any) => sum + (Number(o.total_amount) / 100), 0);
+                const currentUnpaidTotalYuan = tempOrderId
+                    ? Number(orderDetailRes.data.total_amount)
+                    : freshOrders
+                        .filter((o: any) => o.payment_status === 0)
+                        .reduce((sum: number, o: any) => sum + (Number(o.total_amount) / 100), 0);
 
                 // 2. Check localStorage
                 const storedOrder = checkStoredOrder();
@@ -360,6 +387,15 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
     // 返回首页
     const handleGoHome = () => router.push(`/${schoolId || ''}`);
 
+    // 返回上一步
+    const handleBack = () => {
+        const idCard = paymentParamsRef.current.studentIdNumber;
+        const studentId = paymentParamsRef.current.studentId;
+        // 如果有身份证号优先使用身份证号，否则使用数据库ID
+        const queryParam = idCard ? `?id=${idCard}` : (studentId ? `?studentId=${studentId}` : '');
+        router.push(`/${schoolId}/order${queryParam}`);
+    };
+
     // 获取支付方式文本
     const getPaymentMethodText = () => {
         switch (paymentParamsRef.current.paymentMethod) {
@@ -450,10 +486,32 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
                                     <span className="text-gray-600">学生姓名：</span>
                                     <span className="font-medium">{studentInfo?.name || '未知'}</span>
                                 </div>
-                                <div className="flex justify-between py-2 border-b border-gray-200">
-                                    <span className="text-gray-600">身份证号：</span>
-                                    <span className="font-medium">{paymentParamsRef.current.studentIdNumber}</span>
-                                </div>
+                                {studentInfo?.id_card && (
+                                    <div className="flex justify-between py-2 border-b border-gray-200">
+                                        <span className="text-gray-600">身份证号：</span>
+                                        <span className="font-medium">{studentInfo.id_card}</span>
+                                    </div>
+                                )}
+                                {studentInfo?.phone && (
+                                    <div className="flex justify-between py-2 border-b border-gray-200">
+                                        <span className="text-gray-600">手机号：</span>
+                                        <span className="font-medium">{studentInfo.phone}</span>
+                                    </div>
+                                )}
+                                {studentInfo?.birthday && (
+                                    <div className="flex justify-between py-2 border-b border-gray-200">
+                                        <span className="text-gray-600">出生日期：</span>
+                                        <span className="font-medium">{studentInfo.birthday}</span>
+                                    </div>
+                                )}
+                                {studentInfo?.class_name && studentInfo.class_name !== '未分班' && (
+                                    <div className="flex justify-between py-2 border-b border-gray-200">
+                                        <span className="text-gray-600">所属班级：</span>
+                                        <span className="font-medium">
+                                            {studentInfo.grade_name || ''}{studentInfo.class_name}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -533,16 +591,36 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
                         </div>
 
                         {/* 操作按钮 */}
-                        <div className="pt-4">
+                        <div className="space-y-4 pt-4">
                             {!isExpired && (
                                 <button
                                     type="button"
                                     onClick={handleManualCheck}
-                                    className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                    className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
                                     disabled={loading}
                                 >
                                     {loading ? '查询中...' : '我已付款'}
                                 </button>
+                            )}
+
+                            {/* 操作按钮 - 正常调用时不展示导航按钮 */}
+                            {(error || !prepayData) && (
+                                <div className="flex gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={handleBack}
+                                        className="flex-1 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium text-sm"
+                                    >
+                                        返回上一步
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleGoHome}
+                                        className="flex-1 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                                    >
+                                        回到首页
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>

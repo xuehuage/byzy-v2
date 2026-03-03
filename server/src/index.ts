@@ -9,6 +9,7 @@ import importRoutes from "./routes/importRoutes"
 import appRoutes from "./routes"
 import { rateLimit } from "express-rate-limit"
 import { WebSocketService } from "./websocket"
+import path from "path"
 
 dotenv.config()
 
@@ -39,6 +40,10 @@ app.use("/api/auth", authRoutes)
 app.use("/api", importRoutes) // Keep existing import routes
 app.use("/api", appRoutes)    // Mount new business routes
 
+// Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')))
+app.use('/api/uploads', express.static(path.join(__dirname, '../public/uploads')))
+
 AppDataSource.initialize().then(async () => {
     console.log("Database connected")
     WebSocketService.init(server)
@@ -46,4 +51,3 @@ AppDataSource.initialize().then(async () => {
         console.log(`Server running on port ${PORT}`)
     })
 }).catch(error => console.log(error))
-// Trigger restart after truncation

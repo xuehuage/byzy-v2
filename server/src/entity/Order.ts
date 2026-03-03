@@ -1,11 +1,16 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm"
 import { Student } from "./Student"
 import { OrderItem } from "./OrderItem"
+import { AfterSalesRecord } from "./AfterSalesRecord"
 
 export enum OrderStatus {
     PENDING = "PENDING",
     PAID = "PAID",
-    CANCELLED = "CANCELLED"
+    EXCHANGING = "EXCHANGING",
+    SHIPPED = "SHIPPED",
+    CANCELLED = "CANCELLED",
+    REFUNDING = "REFUNDING",
+    REFUNDED = "REFUNDED"
 }
 
 @Entity("orders")
@@ -53,4 +58,7 @@ export class Order {
 
     @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
     items!: OrderItem[]
+
+    @OneToMany(() => AfterSalesRecord, (record) => record.order)
+    afterSales!: AfterSalesRecord[]
 }

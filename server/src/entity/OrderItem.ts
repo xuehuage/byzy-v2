@@ -19,6 +19,18 @@ export class OrderItem {
     @Column({ type: "int", name: 'price_snapshot', comment: "Price in cents" })
     priceSnapshot!: number
 
+    @Column({ type: "varchar", nullable: true })
+    size!: string | null
+
+    @Column({ name: 'is_special_size', type: 'tinyint', default: 0 })
+    isSpecialSize!: boolean
+
+    @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+    height!: number | null
+
+    @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+    weight!: number | null
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date
 

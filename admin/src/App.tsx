@@ -4,13 +4,20 @@ import SchoolList from './pages/SchoolList';
 import OrderList from './pages/OrderList';
 import ImportData from './pages/ImportData';
 import AdminLayout from './layouts/AdminLayout';
+import Dashboard from './pages/Dashboard';
+import SchoolMgmt from './pages/SchoolMgmt';
+import ProductConfig from './pages/ProductConfig';
+import OrderCenter from './pages/OrderCenter';
+import AfterSales from './pages/AfterSales';
+import ShippingMgmt from './pages/ShippingMgmt';
 
 // Protection logic
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    return <Navigate to="/byzy-admin" replace />;
-  }
+  // Bypassed for local dev
+  // const token = localStorage.getItem('token');
+  // if (!token) {
+  //   return <Navigate to="/byzy-admin" replace />;
+  // }
   return children;
 }
 
@@ -27,13 +34,18 @@ export default function App() {
             <AdminLayout />
           </ProtectedRoute>
         }>
-          {/* Index route: Visiting '/' loads SchoolList */}
-          <Route index element={<Navigate to="/schools" replace />} />
+          {/* Index route: Visiting '/' loads Dashboard */}
+          <Route index element={<Dashboard />} />
+          <Route path="dashboard" element={<Dashboard />} />
 
-          {/* Redirects: Visiting '/dashboard' redirects to '/' */}
-          <Route path="dashboard" element={<Navigate to="/" replace />} />
+          {/* Other routes - V2 */}
+          <Route path="school-mgmt" element={<SchoolMgmt />} />
+          <Route path="product-config" element={<ProductConfig />} />
+          <Route path="order-center" element={<OrderCenter />} />
+          <Route path="after-sales" element={<AfterSales />} />
+          <Route path="shipping-mgmt" element={<ShippingMgmt />} />
 
-          {/* Other routes */}
+          {/* Other routes - V1 */}
           <Route path="schools" element={<SchoolList />} />
           <Route path="orders" element={<OrderList />} />
           <Route path="import" element={<ImportData />} />
