@@ -14,14 +14,6 @@ function getProductName(product?: any) {
     return productTypeMap[product.type] ?? '校服';
 }
 
-function buildItemsDesc(items?: any[]) {
-    if (!items || items.length === 0) return '—';
-    return items.map(item => {
-        const name = getProductName(item.product);
-        const size = item.size || '—';
-        return `${name} ${item.quantity} 套，尺码 ${size}`;
-    }).join('；');
-}
 
 const AfterSales: React.FC = () => {
     const [loading, setLoading] = useState(false);
@@ -118,7 +110,8 @@ const AfterSales: React.FC = () => {
                         : <Text strong style={{ color: '#1677ff' }}>{r.newSize || '160#'}</Text>;
                     return <Text type="secondary">{r.originalSize} → {newSizeDisplay}</Text>;
                 }
-                return <Text type="secondary">{buildItemsDesc((r.order as any)?.items)}</Text>;
+                const name = getProductName(r.product);
+                return <Text type="secondary">{name} {r.newQuantity} 套</Text>;
             }
         },
         { title: '申请时间', dataIndex: 'createdAt', key: 'createdAt', render: (val) => new Date(val).toLocaleString() },
@@ -216,13 +209,18 @@ const AfterSales: React.FC = () => {
                         ) : (
                             <>
                                 <Descriptions.Item label="退款商品">
-                                    {buildItemsDesc((selectedRecord.order as any)?.items)}
+                                    {getProductName(selectedRecord.product)} {selectedRecord.newQuantity} 套
                                 </Descriptions.Item>
                                 <Descriptions.Item label="退款金额">
                                     <Text strong style={{ color: '#cf1322', fontSize: 16 }}>
-                                        ¥{((selectedRecord.order as any)?.totalAmount || 0) / 100}
+                                        ¥{((selectedRecord.product?.price || 0) * selectedRecord.newQuantity) / 100}
                                     </Text>
                                 </Descriptions.Item>
+                                {selectedRecord.newQuantity < (selectedRecord.originalQuantity || 0) && (
+                                    <Descriptions.Item label="售后说明">
+                                        部分退款（购买 {selectedRecord.originalQuantity} 套，退款 {selectedRecord.newQuantity} 套）
+                                    </Descriptions.Item>
+                                )}
                             </>
                         )}
 

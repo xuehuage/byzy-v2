@@ -43,6 +43,7 @@ export interface AfterSalesRecord {
     weight: number | null
     createdAt: string
     order?: Order
+    product?: any
 }
 
 // --- API Types ---
@@ -92,6 +93,7 @@ export interface Grade {
     id: number
     schoolId: number
     name: string
+    school?: School
     classes?: ClassEntity[]
     studentCount?: number
 }

@@ -16,6 +16,7 @@ export class AfterSalesController {
                 .leftJoinAndSelect("order.student", "student")
                 .leftJoinAndSelect("order.items", "items")
                 .leftJoinAndSelect("items.product", "product")
+                .leftJoinAndSelect("record.product", "recordProduct")
                 .orderBy("record.createdAt", "DESC")
                 .skip(skip)
                 .take(take)
@@ -47,7 +48,7 @@ export class AfterSalesController {
             await AppDataSource.manager.transaction(async (transactionalEntityManager) => {
                 const record = await transactionalEntityManager.findOne(AfterSalesRecord, {
                     where: { id },
-                    relations: ["order"]
+                    relations: ["order", "product"]
                 })
 
                 if (!record) throw new Error("Record not found")
@@ -59,12 +60,18 @@ export class AfterSalesController {
 
                 // Update order status based on type
                 if (record.type === "REFUND") {
+                    // Calculate refund amount: If productId is set, use it. Otherwise (legacy) use order total.
+                    let refundAmount = record.order.totalAmount
+                    if (record.product) {
+                        refundAmount = Number(record.product.price) * record.newQuantity
+                    }
+
                     // 调用收錢吧退款接口
                     if (record.order.clientSn) {
                         const refundRequestNo = `REF${record.id}_${Date.now()}`
                         const refundResult = await PaymentService.refund({
                             clientSn: record.order.clientSn,
-                            refundAmount: record.order.totalAmount,
+                            refundAmount: refundAmount,
                             refundRequestNo
                         })
                         console.log('[AfterSales] Refund result:', JSON.stringify(refundResult))
@@ -78,7 +85,15 @@ export class AfterSalesController {
                         console.warn('[AfterSales] Order has no clientSn, skipping third-party refund call')
                     }
 
-                    record.order.status = OrderStatus.REFUNDED
+                    // If it's a full refund, set status to REFUNDED. 
+                    // If partial, we stay in PAID but maybe add a flag? 
+                    // Guidance: "最后的显示逻辑应该在商品项中体现... 总数的计算应同步".
+                    // For now, we set order status to PAID (or stay PAID) if it's partial, or REFUNDED if full.
+                    if (refundAmount >= record.order.totalAmount) {
+                        record.order.status = OrderStatus.REFUNDED
+                    } else {
+                        record.order.status = OrderStatus.PAID // Revert from REFUNDING to PAID
+                    }
                     await transactionalEntityManager.save(record.order)
                 }
             })
@@ -123,7 +138,7 @@ export class AfterSalesController {
     static async create(req: Request, res: Response) {
         try {
             console.log('[AfterSales] Create record request:', JSON.stringify(req.body))
-            const { order_id, type, original_size, new_size, original_quantity, new_quantity, is_special_size, height, weight } = req.body
+            const { order_id, type, product_id, original_size, new_size, original_quantity, new_quantity, is_special_size, height, weight } = req.body
 
             // Loose check for order_id to support string numbers and explicit 0 checks
             if ((order_id === undefined || order_id === null || order_id === '') || !type) {
@@ -133,7 +148,7 @@ export class AfterSalesController {
 
             const order = await AppDataSource.getRepository(Order).findOne({
                 where: { id: Number(order_id) },
-                relations: ["items"]
+                relations: ["items", "items.product"]
             })
             if (!order) return res.status(404).json({ code: 404, message: "订单不存在" })
 
@@ -151,12 +166,17 @@ export class AfterSalesController {
                 await AppDataSource.getRepository(Order).save(order)
             }
 
-            const primaryItem = order.items?.[0]
-            const finalOriginalSize = original_size || primaryItem?.size || "未填"
-            const finalOriginalQty = Number(original_quantity || primaryItem?.quantity || 1)
+            // Determine specific item if product_id is provided
+            const targetItem = product_id
+                ? order.items?.find(i => i.product.id === Number(product_id))
+                : order.items?.[0]
+
+            const finalOriginalSize = original_size || targetItem?.size || "未填"
+            const finalOriginalQty = Number(original_quantity || targetItem?.quantity || 1)
 
             const record = AppDataSource.getRepository(AfterSalesRecord).create({
                 orderId: Number(order_id),
+                productId: product_id ? Number(product_id) : (targetItem?.product?.id || null),
                 type,
                 originalSize: finalOriginalSize,
                 newSize: new_size || null,

@@ -116,13 +116,13 @@ export class SchoolController {
                 query.addSelect(qb => {
                     const typeKey = `type_${alias}`
                     const excludeKey = `exclude_${alias}`
-                    const subQuery = qb.select("IFNULL(SUM(oi.quantity), 0)", alias)
+                    const subQuery = qb.select("IFNULL(SUM(oi.quantity), 0) - IFNULL((SELECT SUM(asr.new_quantity) FROM after_sales_records asr WHERE asr.order_id = o.id AND asr.product_id = p.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND'), 0)", alias)
                         .from("order_items", "oi")
                         .innerJoin("products", "p", "oi.product_id = p.id")
                         .innerJoin("orders", "o", "oi.order_id = o.id")
-                        .where("p.school_id = school.id") // Robust join via product
+                        .where("p.school_id = school.id")
                         .andWhere(`p.type = :${typeKey}`, { [typeKey]: type })
-                        .andWhere(`o.status NOT IN (:...${excludeKey})`, { [excludeKey]: [OrderStatus.CANCELLED, OrderStatus.REFUNDED] })
+                        .andWhere(`o.status NOT IN (:...${excludeKey})`, { [excludeKey]: [OrderStatus.CANCELLED] })
                     return applyDateFilter(subQuery, "o", `_${alias}`)
                 }, alias)
             }

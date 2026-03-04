@@ -90,10 +90,19 @@ export class OrderController {
                 .leftJoin("items.product", "product")
                 .leftJoin("student.class", "class")
                 .select("SUM(order.totalAmount)", "totalRevenue")
-                .addSelect("SUM(CASE WHEN product.type = 0 THEN items.quantity ELSE 0 END)", "summerQty")
-                .addSelect("SUM(CASE WHEN product.type = 1 THEN items.quantity ELSE 0 END)", "autumnQty")
-                .addSelect("SUM(CASE WHEN product.type = 2 THEN items.quantity ELSE 0 END)", "winterQty")
-                .where("order.status NOT IN (:...summaryExclude)", { summaryExclude: [OrderStatus.CANCELLED, OrderStatus.REFUNDED] })
+                .addSelect(`
+                    SUM(CASE WHEN product.type = 0 THEN items.quantity ELSE 0 END) - 
+                    SUM(CASE WHEN product.type = 0 THEN (SELECT IFNULL(SUM(asr.new_quantity), 0) FROM after_sales_records asr WHERE asr.order_id = order.id AND asr.product_id = product.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND') ELSE 0 END)
+                `, "summerQty")
+                .addSelect(`
+                    SUM(CASE WHEN product.type = 1 THEN items.quantity ELSE 0 END) - 
+                    SUM(CASE WHEN product.type = 1 THEN (SELECT IFNULL(SUM(asr.new_quantity), 0) FROM after_sales_records asr WHERE asr.order_id = order.id AND asr.product_id = product.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND') ELSE 0 END)
+                `, "autumnQty")
+                .addSelect(`
+                    SUM(CASE WHEN product.type = 2 THEN items.quantity ELSE 0 END) - 
+                    SUM(CASE WHEN product.type = 2 THEN (SELECT IFNULL(SUM(asr.new_quantity), 0) FROM after_sales_records asr WHERE asr.order_id = order.id AND asr.product_id = product.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND') ELSE 0 END)
+                `, "winterQty")
+                .where("order.status NOT IN (:...summaryExclude)", { summaryExclude: [OrderStatus.CANCELLED] })
 
             // Apply same filters
             if (schoolId && schoolId !== 'all') summaryQuery.andWhere("school.id = :schoolId", { schoolId })

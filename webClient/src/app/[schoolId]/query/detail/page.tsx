@@ -19,7 +19,7 @@ const SIZES_OPTIONS = [
 function formatAmount(val: any) {
     const num = Number(val);
     if (isNaN(num)) return '0.00';
-    return num > 1000 ? (num / 100).toFixed(2) : num.toFixed(2);
+    return (num / 100).toFixed(2);
 }
 
 export default function QueryDetailPage({ params }: { params: Promise<{ schoolId: string }> }) {

@@ -13,11 +13,10 @@ import ShippingMgmt from './pages/ShippingMgmt';
 
 // Protection logic
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  // Bypassed for local dev
-  // const token = localStorage.getItem('token');
-  // if (!token) {
-  //   return <Navigate to="/byzy-admin" replace />;
-  // }
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/byzy-admin" replace />;
+  }
   return children;
 }
 

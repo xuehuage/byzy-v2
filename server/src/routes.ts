@@ -8,42 +8,41 @@ import { ShippingController } from "./controller/ShippingController"
 import { UploadController } from "./controller/UploadController"
 import { ImportController } from "./controller/ImportController"
 import { upload } from "./middleware/upload"
-import express from "express"
-import path from "path"
+import { auth } from "./middleware/authMiddleware"
 
 const router = Router()
 
-// Admin Routes (previously business routes)
-router.get("/schools", SchoolController.getAll)
-router.get("/schools/stats", SchoolController.getStats)
-router.get("/schools/:id/export", SchoolController.exportData)
-router.post("/schools/batch", SchoolController.batchCreate)
-router.put("/schools/:id/batch", SchoolController.batchUpdate)
-router.get("/classes", ClassController.getBySchool)
-router.get("/orders", OrderController.search)
-router.post("/orders/supplementary", OrderController.createSupplementary)
-router.put("/orders/:id", OrderController.update)
-router.delete("/orders/:id", OrderController.delete)
+// Admin Routes (protected)
+router.get("/schools", auth, SchoolController.getAll)
+router.get("/schools/stats", auth, SchoolController.getStats)
+router.get("/schools/:id/export", auth, SchoolController.exportData)
+router.post("/schools/batch", auth, SchoolController.batchCreate)
+router.put("/schools/:id/batch", auth, SchoolController.batchUpdate)
+router.get("/classes", auth, ClassController.getBySchool)
+router.get("/orders", auth, OrderController.search)
+router.post("/orders/supplementary", auth, OrderController.createSupplementary)
+router.put("/orders/:id", auth, OrderController.update)
+router.delete("/orders/:id", auth, OrderController.delete)
 
-// V2 Admin School Config
-router.get("/schools/:id/config", SchoolController.getConfig)
-router.put("/schools/:id/config", SchoolController.updateConfig)
+// V2 Admin School Config (protected)
+router.get("/schools/:id/config", auth, SchoolController.getConfig)
+router.put("/schools/:id/config", auth, SchoolController.updateConfig)
 
-// Image Upload
-router.post("/upload", upload.single('image'), UploadController.uploadImage)
-// After-sales
-router.get("/after-sales", AfterSalesController.getAll)
-router.put("/after-sales/:id/approve", AfterSalesController.approve)
-router.put("/after-sales/:id/reject", AfterSalesController.reject)
+// Image Upload (protected)
+router.post("/upload", auth, upload.single('image'), UploadController.uploadImage)
+// After-sales (protected)
+router.get("/after-sales", auth, AfterSalesController.getAll)
+router.put("/after-sales/:id/approve", auth, AfterSalesController.approve)
+router.put("/after-sales/:id/reject", auth, AfterSalesController.reject)
 
-// Shipping Management
-router.get("/shipping/stats", ShippingController.getStats)
-router.get("/shipping/:schoolId/export", ShippingController.exportManifest)
-router.post("/shipping/:schoolId/confirm", ShippingController.confirmShip)
+// Shipping Management (protected)
+router.get("/shipping/stats", auth, ShippingController.getStats)
+router.get("/shipping/:schoolId/export", auth, ShippingController.exportManifest)
+router.post("/shipping/:schoolId/confirm", auth, ShippingController.confirmShip)
 
-// V2 Roster Matching
-router.post("/import/roster-preview", ImportController.rosterPreview)
-router.post("/import/roster-apply", ImportController.rosterApply)
+// V2 Roster Matching (protected)
+router.post("/import/roster-preview", auth, ImportController.rosterPreview)
+router.post("/import/roster-apply", auth, ImportController.rosterApply)
 
 // Public Routes (for webClient)
 router.get("/public/school/:id", PublicController.getSchool)

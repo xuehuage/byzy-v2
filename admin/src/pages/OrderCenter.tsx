@@ -31,10 +31,10 @@ const OrderCenter: React.FC = () => {
                 const schoolData = res.data.data;
                 setSchools(schoolData);
                 if (schoolData.length > 0) {
-                    const firstSchoolId = schoolData[0].id;
-                    form.setFieldsValue({ schoolId: firstSchoolId });
-                    handleSchoolChange(firstSchoolId);
-                    fetchOrders(1, { schoolId: firstSchoolId });
+                    const firstSchool = schoolData[0];
+                    form.setFieldsValue({ schoolId: firstSchool.id });
+                    setGrades(firstSchool.grades || []);
+                    fetchOrders(1, { schoolId: firstSchool.id });
                 }
             }
         } catch (error) {

@@ -60,7 +60,14 @@ export class AfterSalesRecord {
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt!: Date
 
+    @Column({ name: "product_id", nullable: true })
+    productId!: number | null
+
     @ManyToOne(() => Order)
     @JoinColumn({ name: "order_id" })
     order!: Order
+
+    @ManyToOne("Product")
+    @JoinColumn({ name: "product_id" })
+    product!: any
 }

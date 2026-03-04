@@ -21,12 +21,11 @@ request.interceptors.response.use(
             const { status, data } = error.response
             message.error(data.message || 'Request failed')
             if (status === 401) {
-                // Bypassed for local dev
-                // localStorage.removeItem('token')
+                localStorage.removeItem('token')
                 // Only redirect if not already on the login page to avoid refresh loop
-                // if (window.location.pathname !== '/byzy-admin') {
-                //     window.location.href = '/byzy-admin'
-                // }
+                if (window.location.pathname !== '/byzy-admin') {
+                    window.location.href = '/byzy-admin'
+                }
             }
         } else {
             message.error('Network Error')
