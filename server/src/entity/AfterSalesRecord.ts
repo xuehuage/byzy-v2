@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from "typeorm"
 import { Order } from "./Order"
+import { Product } from "./Product"
 
 export enum AfterSalesType {
     EXCHANGE = "EXCHANGE",

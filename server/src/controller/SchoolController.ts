@@ -116,15 +116,29 @@ export class SchoolController {
                 query.addSelect(qb => {
                     const typeKey = `type_${alias}`
                     const excludeKey = `exclude_${alias}`
-                    const subQuery = qb.select("IFNULL(SUM(oi.quantity), 0) - IFNULL((SELECT SUM(asr.new_quantity) FROM after_sales_records asr WHERE asr.order_id = o.id AND asr.product_id = p.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND'), 0)", alias)
+                    return qb.select("IFNULL(SUM(oi.quantity), 0)", alias)
                         .from("order_items", "oi")
                         .innerJoin("products", "p", "oi.product_id = p.id")
                         .innerJoin("orders", "o", "oi.order_id = o.id")
                         .where("p.school_id = school.id")
                         .andWhere(`p.type = :${typeKey}`, { [typeKey]: type })
                         .andWhere(`o.status NOT IN (:...${excludeKey})`, { [excludeKey]: [OrderStatus.CANCELLED] })
-                    return applyDateFilter(subQuery, "o", `_${alias}`)
                 }, alias)
+
+                // Add a separate column for refund quantity to be subtracted later in JS
+                const refundAlias = `${alias}Refund`
+                query.addSelect(qb => {
+                    const typeKey = `type_${refundAlias}`
+                    return qb.select("IFNULL(SUM(asr.new_quantity), 0)", refundAlias)
+                        .from("after_sales_records", "asr")
+                        .innerJoin("products", "p", "asr.product_id = p.id")
+                        .innerJoin("orders", "o", "asr.order_id = o.id")
+                        .where("p.school_id = school.id")
+                        .andWhere(`p.type = :${typeKey}`, { [typeKey]: type })
+                        .andWhere("asr.status = 'PROCESSED'")
+                        .andWhere("asr.type = 'REFUND'")
+                    return applyDateFilter(qb, "o", `_ref_${alias}`)
+                }, refundAlias)
             }
 
             addProductQtySelect("summerQty", 0)
@@ -158,9 +172,9 @@ export class SchoolController {
 
             // Transformation and Formula-based Revenue Calculation
             const result = schools.map(s => {
-                const summerQty = Number(s.summerQty || 0)
-                const autumnQty = Number(s.autumnQty || 0) // Label mapping corrected from springQty
-                const winterQty = Number(s.winterQty || 0)
+                const summerQty = Math.max(0, Number(s.summerQty || 0) - Number(s.summerQtyRefund || 0))
+                const autumnQty = Math.max(0, Number(s.autumnQty || 0) - Number(s.autumnQtyRefund || 0))
+                const winterQty = Math.max(0, Number(s.winterQty || 0) - Number(s.winterQtyRefund || 0))
 
                 const summerPrice = Number(s.summerPrice || 0)
                 const autumnPrice = Number(s.autumnPrice || 0)

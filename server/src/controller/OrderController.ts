@@ -92,15 +92,57 @@ export class OrderController {
                 .select("SUM(order.totalAmount)", "totalRevenue")
                 .addSelect(`
                     SUM(CASE WHEN product.type = 0 THEN items.quantity ELSE 0 END) - 
-                    SUM(CASE WHEN product.type = 0 THEN (SELECT IFNULL(SUM(asr.new_quantity), 0) FROM after_sales_records asr WHERE asr.order_id = order.id AND asr.product_id = product.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND') ELSE 0 END)
+                    IFNULL((
+                        SELECT SUM(asr.new_quantity) 
+                        FROM after_sales_records asr 
+                        INNER JOIN products p2 ON asr.product_id = p2.id
+                        WHERE asr.status = 'PROCESSED' AND asr.type = 'REFUND'
+                        AND asr.order_id IN (
+                            SELECT o2.id FROM orders o2 
+                            INNER JOIN students s2 ON o2.student_id = s2.id
+                            INNER JOIN grades g2 ON s2.grade_id = g2.id
+                            WHERE p2.type = 0
+                            ${schoolId && schoolId !== 'all' ? `AND g2.school_id = ${Number(schoolId)}` : ''}
+                            ${gradeId && gradeId !== 'all' ? `AND s2.grade_id = ${Number(gradeId)}` : ''}
+                            ${classId && classId !== 'all' ? `AND s2.class_id = ${Number(classId)}` : ''}
+                        )
+                    ), 0)
                 `, "summerQty")
                 .addSelect(`
                     SUM(CASE WHEN product.type = 1 THEN items.quantity ELSE 0 END) - 
-                    SUM(CASE WHEN product.type = 1 THEN (SELECT IFNULL(SUM(asr.new_quantity), 0) FROM after_sales_records asr WHERE asr.order_id = order.id AND asr.product_id = product.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND') ELSE 0 END)
+                    IFNULL((
+                        SELECT SUM(asr.new_quantity) 
+                        FROM after_sales_records asr 
+                        INNER JOIN products p2 ON asr.product_id = p2.id
+                        WHERE asr.status = 'PROCESSED' AND asr.type = 'REFUND'
+                        AND asr.order_id IN (
+                            SELECT o2.id FROM orders o2 
+                            INNER JOIN students s2 ON o2.student_id = s2.id
+                            INNER JOIN grades g2 ON s2.grade_id = g2.id
+                            WHERE p2.type = 1
+                            ${schoolId && schoolId !== 'all' ? `AND g2.school_id = ${Number(schoolId)}` : ''}
+                            ${gradeId && gradeId !== 'all' ? `AND s2.grade_id = ${Number(gradeId)}` : ''}
+                            ${classId && classId !== 'all' ? `AND s2.class_id = ${Number(classId)}` : ''}
+                        )
+                    ), 0)
                 `, "autumnQty")
                 .addSelect(`
                     SUM(CASE WHEN product.type = 2 THEN items.quantity ELSE 0 END) - 
-                    SUM(CASE WHEN product.type = 2 THEN (SELECT IFNULL(SUM(asr.new_quantity), 0) FROM after_sales_records asr WHERE asr.order_id = order.id AND asr.product_id = product.id AND asr.status = 'PROCESSED' AND asr.type = 'REFUND') ELSE 0 END)
+                    IFNULL((
+                        SELECT SUM(asr.new_quantity) 
+                        FROM after_sales_records asr 
+                        INNER JOIN products p2 ON asr.product_id = p2.id
+                        WHERE asr.status = 'PROCESSED' AND asr.type = 'REFUND'
+                        AND asr.order_id IN (
+                            SELECT o2.id FROM orders o2 
+                            INNER JOIN students s2 ON o2.student_id = s2.id
+                            INNER JOIN grades g2 ON s2.grade_id = g2.id
+                            WHERE p2.type = 2
+                            ${schoolId && schoolId !== 'all' ? `AND g2.school_id = ${Number(schoolId)}` : ''}
+                            ${gradeId && gradeId !== 'all' ? `AND s2.grade_id = ${Number(gradeId)}` : ''}
+                            ${classId && classId !== 'all' ? `AND s2.class_id = ${Number(classId)}` : ''}
+                        )
+                    ), 0)
                 `, "winterQty")
                 .where("order.status NOT IN (:...summaryExclude)", { summaryExclude: [OrderStatus.CANCELLED] })
 
