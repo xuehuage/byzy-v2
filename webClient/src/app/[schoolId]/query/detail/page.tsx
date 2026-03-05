@@ -269,7 +269,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
 
                                                 <div className="flex gap-3">
                                                     {/* Exchange allowed for PAID and SHIPPED, controlled by admin switch and per-item processed status */}
-                                                    {(order.order_status === 'PAID' || order.order_status === 'SHIPPED') &&
+                                                    {(order.order_status === 'PAID' || order.order_status === 'SHIPPED' || order.order_status === 'PARTIAL_REFUNDED') &&
                                                         order.after_sales_config?.exchange_active !== false &&
                                                         order.items.some((item: any) => !(item.exchanges?.length > 0)) && (
                                                             <Button
@@ -294,7 +294,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                             </Button>
                                                         )}
                                                     {/* Refund ONLY allowed for PAID (not SHIPPED), controlled by admin switch and remaining quantity */}
-                                                    {order.order_status === 'PAID' &&
+                                                    {(order.order_status === 'PAID' || order.order_status === 'SHIPPED' || order.order_status === 'PARTIAL_REFUNDED') &&
                                                         order.after_sales_config?.refund_active !== false &&
                                                         order.items.some((item: any) => (item.quantity - (item.refunded_quantity || 0)) > 0) && (
                                                             <Button

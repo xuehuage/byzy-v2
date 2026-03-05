@@ -87,8 +87,8 @@ export class PublicController {
                 updated_at: order.updatedAt,
                 items: items,
                 after_sales_config: {
-                    exchange_active: !!order.student?.grade?.school?.afterSalesExchangeActive,
-                    refund_active: !!order.student?.grade?.school?.afterSalesRefundActive
+                    exchange_active: !!student.grade?.school?.afterSalesExchangeActive,
+                    refund_active: !!student.grade?.school?.afterSalesRefundActive
                 }
             }
         })
