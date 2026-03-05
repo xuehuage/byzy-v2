@@ -279,12 +279,13 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                                 onClick={() => {
                                                                     // Filter to items that haven't been exchanged yet
                                                                     const availableItem = order.items.find((item: any) => !(item.exchanges?.length > 0)) || order.items[0];
+                                                                    const remainingExhangeQty = (availableItem?.quantity || 1) - (availableItem?.refunded_quantity || 0);
                                                                     setExchangeModal({
                                                                         open: true,
                                                                         orderId: order.order_id || order.id,
                                                                         currentSize: availableItem?.size,
-                                                                        maxQty: availableItem?.quantity,
-                                                                        qty: availableItem?.quantity || 1,
+                                                                        maxQty: remainingExhangeQty,
+                                                                        qty: remainingExhangeQty || 1,
                                                                         newSize: '160#',
                                                                         isSpecialSize: false
                                                                     });
@@ -493,15 +494,6 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                             申请退款套数（剩余可退 {refundModal?.maxQty} 套）
                         </Text>
                         <div className="flex items-center gap-4">
-                            <InputNumber
-                                min={1}
-                                max={refundModal?.maxQty || 1}
-                                value={refundQty}
-                                onChange={(v) => setRefundQty(v || 1)}
-                                size="large"
-                                className="w-32 rounded-xl"
-                            />
-                            <Text type="secondary" className="text-sm">套</Text>
                         </div>
                         <div className="flex gap-2 mt-3 flex-wrap">
                             {Array.from({ length: refundModal?.maxQty || 1 }, (_, i) => i + 1).map(n => (

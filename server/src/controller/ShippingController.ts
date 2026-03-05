@@ -1,5 +1,6 @@
 import { Request, Response } from "express"
 import { AppDataSource } from "../data-source"
+import dayjs from "dayjs"
 import { In, Between, LessThanOrEqual, MoreThanOrEqual } from "typeorm"
 import { Order, OrderStatus } from "../entity/Order"
 import { School } from "../entity/School"
@@ -258,7 +259,7 @@ export class ShippingController {
                         autumnSize: '—',
                         winterQty: 0,
                         winterSize: '—',
-                        shippedAt: order.shippedAt ? new Date(order.shippedAt).toLocaleString('zh-CN') : '—'
+                        shippedAt: order.shippedAt ? dayjs(order.shippedAt).format('YYYY/MM/DD') : '—'
                     })
                 }
 
