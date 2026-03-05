@@ -25,9 +25,8 @@ function downloadCSV(rows: any[], filename: string) {
     const headerLabels: Record<string, string> = {
         orderNo: '订单号', studentName: '学生姓名', gradeName: '年级', className: '班级',
         birthday: '生日', productType: '商品类型',
-        size: '尺码', isSpecialSize: '特殊身材', height: '身高(cm)',
-        weight: '体重(斤)', quantity: '套数', totalAmount: '支付金额(元)',
-        status: '订单状态'
+        size: '尺码', originalSize: '原尺码(回收)', quantity: '套数', status: '订单状态',
+        isSpecialSize: '特殊身材', height: '身高(cm)', weight: '体重(斤)'
     };
     const csvHeader = headers.map(h => headerLabels[h] || h).join(',');
     const csvRows = rows.map(r =>

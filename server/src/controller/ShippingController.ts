@@ -95,7 +95,7 @@ export class ShippingController {
                 .leftJoinAndSelect('student.class', 'class')
                 .innerJoinAndSelect('order.items', 'item')
                 .innerJoinAndSelect('item.product', 'product')
-                .leftJoinAndSelect('order.afterSales', 'asr', 'asr.type = :type AND asr.status = :asrStatus', { type: AfterSalesType.EXCHANGE, asrStatus: AfterSalesStatus.PENDING })
+                .leftJoinAndSelect('order.afterSales', 'asr', 'asr.status IN (:...asrStatuses)', { asrStatuses: [AfterSalesStatus.PENDING, AfterSalesStatus.PROCESSED] })
                 .innerJoin('student.grade', 'g')
                 .innerJoin('g.school', 'school')
                 .where('school.id = :schoolId', { schoolId })
@@ -105,19 +105,33 @@ export class ShippingController {
                 .getMany()
 
             const rows = orders.flatMap(order => {
-                const asr = (order as any).afterSales?.[0] as AfterSalesRecord | undefined
-
                 return order.items.map(item => {
                     const isExchanging = order.status === OrderStatus.EXCHANGING
 
-                    // Calculate refunded quantity for this item
-                    const refundedQty = (order.afterSales || [])
-                        .filter(asr => asr.productId === item.product?.id && asr.type === 'REFUND' && asr.status === AfterSalesStatus.PROCESSED)
-                        .reduce((sum, r) => sum + Number(r.newQuantity), 0)
+                    // 1. Get pending exchange for this specific product (if any)
+                    const pendingExchange = (order.afterSales || []).find(asr =>
+                        asr.productId === item.product?.id &&
+                        asr.type === AfterSalesType.EXCHANGE &&
+                        asr.status === AfterSalesStatus.PENDING
+                    );
 
-                    const actualQty = (isExchanging && asr?.newQuantity !== undefined)
-                        ? asr.newQuantity
-                        : Math.max(0, item.quantity - refundedQty)
+                    // 2. Get processed refunds for this specific product (if any)
+                    const refundedQty = (order.afterSales || [])
+                        .filter(asr =>
+                            asr.productId === item.product?.id &&
+                            asr.type === AfterSalesType.REFUND &&
+                            asr.status === AfterSalesStatus.PROCESSED
+                        )
+                        .reduce((sum, r) => sum + Number(r.newQuantity), 0);
+
+                    // 3. Final calculation: 
+                    // If exchanging, use exchange value; 
+                    // otherwise use (original - processed refunds)
+                    const actualQty = pendingExchange
+                        ? pendingExchange.newQuantity
+                        : Math.max(0, item.quantity - refundedQty);
+
+                    const actualSize = pendingExchange?.newSize || item.size || '—';
 
                     return {
                         orderNo: order.orderNo,
@@ -126,13 +140,13 @@ export class ShippingController {
                         className: order.student?.class?.name || '未分班',
                         birthday: order.student?.birthday || '',
                         productType: productTypeNames[item.product?.type] || '校服',
-                        size: (isExchanging && asr?.newSize) ? asr.newSize : (item.size || '—'),
+                        size: actualSize,
+                        originalSize: pendingExchange ? (item.size || '—') : '',
+                        quantity: actualQty,
+                        status: isExchanging ? '调换' : (refundedQty > 0 ? '部分退款' : '增订'),
                         isSpecialSize: item.isSpecialSize ? '是' : '否',
                         height: item.height || '',
-                        weight: item.weight || '',
-                        quantity: actualQty,
-                        totalAmount: (order.totalAmount / 100).toFixed(2),
-                        status: isExchanging ? '调换' : (refundedQty > 0 ? '部分退款' : '增订')
+                        weight: item.weight || ''
                     }
                 })
             })
