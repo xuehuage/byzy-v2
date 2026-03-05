@@ -144,6 +144,26 @@ fwIDAQAB
             refund_amount: params.refundAmount.toString()
         }
 
-        return this.requestThirdParty('/upay/v2/refund', payload, terminal.terminalSn, terminal.terminalKey)
+        const response = await this.requestThirdParty('/upay/v2/refund', payload, terminal.terminalSn, terminal.terminalKey)
+
+        // Add specific check for already refunded code
+        const bizResponse = response?.biz_response
+        const errorCode = bizResponse?.error_code
+        const errorMsg = bizResponse?.error_message || ''
+
+        if (bizResponse?.result_code === 'FAIL' &&
+            (errorCode === 'UPAY_REFUND_ORDER_NOOP' || errorCode === 'EP41' || errorMsg.includes('已全额退款') || errorMsg.includes('EP41'))) {
+            console.log('[PaymentService] Detect Already refunded state, treating as success for sync');
+            return {
+                ...response,
+                biz_response: {
+                    ...bizResponse,
+                    result_code: 'REFUND_SUCCESS',
+                    error_message: 'Already refunded (Synced)'
+                }
+            };
+        }
+
+        return response
     }
 }

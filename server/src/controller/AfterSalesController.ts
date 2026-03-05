@@ -102,15 +102,19 @@ export class AfterSalesController {
                     // For now, we set order status to PAID (or stay PAID) if it's partial, or REFUNDED if full.
                     // Calculate total already refunded + current refund
                     const previousRefunds = await transactionalEntityManager.find(AfterSalesRecord, {
-                        where: { orderId: record.orderId, status: AfterSalesStatus.PROCESSED, type: "REFUND" as any }
+                        where: { orderId: record.orderId, status: AfterSalesStatus.PROCESSED, type: "REFUND" as any },
+                        relations: ["order", "product"]
                     })
                     const totalRefundedBalance = previousRefunds.reduce((sum, r) => {
                         let amt = 0
                         if (r.product) {
                             amt = Number(r.product.price) * r.newQuantity
-                        } else {
+                        } else if (r.order) {
                             // fallback for legacy records without product relation
                             amt = r.order.totalAmount
+                        } else {
+                            // Safety fallback if order is missing
+                            console.warn('[AfterSales] Refund record has no product or order relation loaded:', r.id)
                         }
                         return sum + amt
                     }, 0)

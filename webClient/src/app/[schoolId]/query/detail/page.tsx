@@ -208,14 +208,6 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                     {order.order_status === 'REFUNDING' ? (
                                         <div className="flex items-center gap-2">
                                             <Tag color="orange" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">退款审核中</Tag>
-                                            {order.pending_after_sales?.length > 0 && (
-                                                <button
-                                                    onClick={() => handleCancelAfterSales(order.pending_after_sales[0].id, order.order_id)}
-                                                    className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
-                                                >
-                                                    <CloseCircleOutlined /> 取消
-                                                </button>
-                                            )}
                                         </div>
                                     ) : order.order_status === 'EXCHANGING' ? (
                                         <div className="flex items-center gap-2">
