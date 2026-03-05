@@ -100,10 +100,25 @@ export class AfterSalesController {
                     // If partial, we stay in PAID but maybe add a flag? 
                     // Guidance: "最后的显示逻辑应该在商品项中体现... 总数的计算应同步".
                     // For now, we set order status to PAID (or stay PAID) if it's partial, or REFUNDED if full.
-                    if (refundAmount >= record.order.totalAmount) {
+                    // Calculate total already refunded + current refund
+                    const previousRefunds = await transactionalEntityManager.find(AfterSalesRecord, {
+                        where: { orderId: record.orderId, status: AfterSalesStatus.PROCESSED, type: "REFUND" as any }
+                    })
+                    const totalRefundedBalance = previousRefunds.reduce((sum, r) => {
+                        let amt = 0
+                        if (r.product) {
+                            amt = Number(r.product.price) * r.newQuantity
+                        } else {
+                            // fallback for legacy records without product relation
+                            amt = r.order.totalAmount
+                        }
+                        return sum + amt
+                    }, 0)
+
+                    if (totalRefundedBalance >= record.order.totalAmount) {
                         record.order.status = OrderStatus.REFUNDED
                     } else {
-                        record.order.status = OrderStatus.PAID // Revert from REFUNDING to PAID
+                        record.order.status = OrderStatus.PARTIAL_REFUNDED
                     }
                     await transactionalEntityManager.save(record.order)
                 }

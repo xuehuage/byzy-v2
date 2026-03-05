@@ -79,6 +79,7 @@ export class PublicController {
                     OrderStatus.EXCHANGING,
                     OrderStatus.SHIPPED,
                     OrderStatus.REFUNDING,
+                    OrderStatus.PARTIAL_REFUNDED,
                     OrderStatus.REFUNDED
                 ].includes(order.status) ? 1 : 0,
                 order_status: order.status,

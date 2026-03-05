@@ -194,14 +194,30 @@ export class OrderController {
                 studentName: foundStudentName
             }
 
-            // Pre-calculate quantities for simpler frontend rendering
+            // Pre-calculate quantities and refund data for simpler frontend rendering
             const formattedList = list.map(order => {
-                const summerQty = (order.items || []).filter(i => i.product.type === 0).reduce((sum, i) => sum + i.quantity, 0)
-                const autumnQty = (order.items || []).filter(i => i.product.type === 1).reduce((sum, i) => sum + i.quantity, 0)
-                const winterQty = (order.items || []).filter(i => i.product.type === 2).reduce((sum, i) => sum + i.quantity, 0)
+                const items = (order.items || []).map(item => {
+                    const itemRefunds = (order.afterSales || [])
+                        .filter(asr => asr.productId === item.product?.id && asr.status === 'PROCESSED' && asr.type === 'REFUND');
+
+                    const refundedQty = itemRefunds.reduce((sum, asr) => sum + Number(asr.newQuantity), 0);
+                    const refundedAmount = itemRefunds.reduce((sum, asr) => sum + (Number(item.priceSnapshot) * Number(asr.newQuantity)), 0);
+
+                    return {
+                        ...item,
+                        refundedQuantity: refundedQty,
+                        refundedAmount: refundedAmount,
+                        actualQuantity: item.quantity - refundedQty
+                    };
+                });
+
+                const summerQty = items.filter(i => i.product.type === 0).reduce((sum, i) => sum + i.quantity, 0);
+                const autumnQty = items.filter(i => i.product.type === 1).reduce((sum, i) => sum + i.quantity, 0);
+                const winterQty = items.filter(i => i.product.type === 2).reduce((sum, i) => sum + i.quantity, 0);
 
                 return {
                     ...order,
+                    items,
                     totalAmount: order.totalAmount,
                     summerQty,
                     autumnQty,

@@ -196,12 +196,14 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                         <Tag color="cyan" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">已发货</Tag>
                                     ) : order.order_status === 'REFUNDED' ? (
                                         <Tag color="error" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">已退款</Tag>
+                                    ) : order.order_status === 'PARTIAL_REFUNDED' ? (
+                                        <Tag color="purple" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">部分退款</Tag>
                                     ) : (
                                         <Tag
-                                            color={order.payment_status === 1 ? 'success' : 'warning'}
+                                            color={(order.payment_status === 1 || order.order_status === 'PAID') ? 'success' : 'warning'}
                                             className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm"
                                         >
-                                            {order.payment_status === 1 ? '已付款' : '待付款'}
+                                            {(order.payment_status === 1 || order.order_status === 'PAID') ? '已付款' : '待付款'}
                                         </Tag>
                                     )}
                                 </div>
@@ -244,78 +246,81 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                     </div>
 
                                     {/* Actions */}
-                                    {order.payment_status === 1 && order.order_status !== 'REFUNDING' && order.order_status !== 'EXCHANGING' && order.order_status !== 'REFUNDED' && (
-                                        <div className="flex flex-col gap-4 pt-6 mt-2 border-t border-dashed border-gray-100">
-                                            {/* Item-level After-Sales Status Text */}
-                                            {order.items.map((item: any, iidx: number) => (
-                                                <div key={`status-${iidx}`} className="space-y-1">
-                                                    {item.refunded_quantity > 0 && (
-                                                        <div className="text-[11px] text-green-600 font-bold bg-green-50 px-3 py-2 rounded-xl border border-green-100">
-                                                            已退款{uniformTypeText[item.uniform_type] || item.product_name}{item.refunded_quantity}套，退款金额：{(Number(item.refunded_amount || 0) / 100).toFixed(2)}元
-                                                        </div>
-                                                    )}
-                                                    {(item.exchanges || []).map((ex: any, eidx: number) => (
-                                                        <div key={`ex-${eidx}`} className="text-[11px] text-blue-600 font-bold bg-blue-50 px-3 py-2 rounded-xl border border-blue-100">
-                                                            已完成{uniformTypeText[item.uniform_type] || item.product_name}{ex.qty}套尺码调换，{ex.from} {'->'} {ex.to}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ))}
+                                    {order.payment_status === 1 &&
+                                        order.order_status !== 'REFUNDING' &&
+                                        order.order_status !== 'EXCHANGING' &&
+                                        order.order_status !== 'REFUNDED' && (
+                                            <div className="flex flex-col gap-4 pt-6 mt-2 border-t border-dashed border-gray-100">
+                                                {/* Item-level After-Sales Status Text */}
+                                                {order.items.map((item: any, iidx: number) => (
+                                                    <div key={`status-${iidx}`} className="space-y-1">
+                                                        {item.refunded_quantity > 0 && (
+                                                            <div className="text-[11px] text-green-600 font-bold bg-green-50 px-3 py-2 rounded-xl border border-green-100">
+                                                                已退款{uniformTypeText[item.uniform_type] || item.product_name}{item.refunded_quantity}套，退款金额：{(Number(item.refunded_amount || 0) / 100).toFixed(2)}元
+                                                            </div>
+                                                        )}
+                                                        {(item.exchanges || []).map((ex: any, eidx: number) => (
+                                                            <div key={`ex-${eidx}`} className="text-[11px] text-blue-600 font-bold bg-blue-50 px-3 py-2 rounded-xl border border-blue-100">
+                                                                已完成{uniformTypeText[item.uniform_type] || item.product_name}{ex.qty}套尺码调换，{ex.from} {'->'} {ex.to}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ))}
 
-                                            <div className="flex gap-3">
-                                                {/* Exchange allowed for PAID and SHIPPED, controlled by admin switch and per-item processed status */}
-                                                {(order.order_status === 'PAID' || order.order_status === 'SHIPPED') &&
-                                                    order.after_sales_config?.exchange_active !== false &&
-                                                    order.items.some((item: any) => !(item.exchanges?.length > 0)) && (
-                                                        <Button
-                                                            block
-                                                            icon={<SwapOutlined />}
-                                                            className="rounded-2xl h-12 font-bold text-sm text-blue-600 bg-blue-50 border-none hover:bg-blue-100 transition-all"
-                                                            onClick={() => {
-                                                                // Filter to items that haven't been exchanged yet
-                                                                const availableItem = order.items.find((item: any) => !(item.exchanges?.length > 0)) || order.items[0];
-                                                                setExchangeModal({
-                                                                    open: true,
-                                                                    orderId: order.order_id || order.id,
-                                                                    currentSize: availableItem?.size,
-                                                                    maxQty: availableItem?.quantity,
-                                                                    qty: availableItem?.quantity || 1,
-                                                                    newSize: '160#',
-                                                                    isSpecialSize: false
-                                                                });
-                                                            }}
-                                                        >
-                                                            申请调换
-                                                        </Button>
-                                                    )}
-                                                {/* Refund ONLY allowed for PAID (not SHIPPED), controlled by admin switch and remaining quantity */}
-                                                {order.order_status === 'PAID' &&
-                                                    order.after_sales_config?.refund_active !== false &&
-                                                    order.items.some((item: any) => (item.quantity - (item.refunded_quantity || 0)) > 0) && (
-                                                        <Button
-                                                            block
-                                                            danger
-                                                            icon={<UndoOutlined />}
-                                                            className="rounded-2xl h-12 font-bold text-sm bg-red-50 border-none hover:bg-red-100 transition-all"
-                                                            onClick={() => {
-                                                                // Find first item with remaining quantity
-                                                                const availableItem = order.items.find((item: any) => (item.quantity - (item.refunded_quantity || 0)) > 0) || order.items[0];
-                                                                const remainingQty = (availableItem?.quantity || 1) - (availableItem?.refunded_quantity || 0);
-                                                                setRefundQty(remainingQty > 0 ? 1 : 0);
-                                                                setRefundModal({
-                                                                    open: true,
-                                                                    orderId: order.order_id || order.id,
-                                                                    maxQty: remainingQty,
-                                                                    orderName: uniformTypeText[availableItem.uniform_type] || availableItem.product_name
-                                                                });
-                                                            }}
-                                                        >
-                                                            申请退款
-                                                        </Button>
-                                                    )}
+                                                <div className="flex gap-3">
+                                                    {/* Exchange allowed for PAID and SHIPPED, controlled by admin switch and per-item processed status */}
+                                                    {(order.order_status === 'PAID' || order.order_status === 'SHIPPED') &&
+                                                        order.after_sales_config?.exchange_active !== false &&
+                                                        order.items.some((item: any) => !(item.exchanges?.length > 0)) && (
+                                                            <Button
+                                                                block
+                                                                icon={<SwapOutlined />}
+                                                                className="rounded-2xl h-12 font-bold text-sm text-blue-600 bg-blue-50 border-none hover:bg-blue-100 transition-all"
+                                                                onClick={() => {
+                                                                    // Filter to items that haven't been exchanged yet
+                                                                    const availableItem = order.items.find((item: any) => !(item.exchanges?.length > 0)) || order.items[0];
+                                                                    setExchangeModal({
+                                                                        open: true,
+                                                                        orderId: order.order_id || order.id,
+                                                                        currentSize: availableItem?.size,
+                                                                        maxQty: availableItem?.quantity,
+                                                                        qty: availableItem?.quantity || 1,
+                                                                        newSize: '160#',
+                                                                        isSpecialSize: false
+                                                                    });
+                                                                }}
+                                                            >
+                                                                申请调换
+                                                            </Button>
+                                                        )}
+                                                    {/* Refund ONLY allowed for PAID (not SHIPPED), controlled by admin switch and remaining quantity */}
+                                                    {order.order_status === 'PAID' &&
+                                                        order.after_sales_config?.refund_active !== false &&
+                                                        order.items.some((item: any) => (item.quantity - (item.refunded_quantity || 0)) > 0) && (
+                                                            <Button
+                                                                block
+                                                                danger
+                                                                icon={<UndoOutlined />}
+                                                                className="rounded-2xl h-12 font-bold text-sm bg-red-50 border-none hover:bg-red-100 transition-all"
+                                                                onClick={() => {
+                                                                    // Find first item with remaining quantity
+                                                                    const availableItem = order.items.find((item: any) => (item.quantity - (item.refunded_quantity || 0)) > 0) || order.items[0];
+                                                                    const remainingQty = (availableItem?.quantity || 1) - (availableItem?.refunded_quantity || 0);
+                                                                    setRefundQty(remainingQty > 0 ? 1 : 0);
+                                                                    setRefundModal({
+                                                                        open: true,
+                                                                        orderId: order.order_id || order.id,
+                                                                        maxQty: remainingQty,
+                                                                        orderName: uniformTypeText[availableItem.uniform_type] || availableItem.product_name
+                                                                    });
+                                                                }}
+                                                            >
+                                                                申请退款
+                                                            </Button>
+                                                        )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
                                     {(order.order_status === 'REFUNDING' || order.order_status === 'EXCHANGING') && (
                                         <div className="mt-4 pt-4 border-t border-dashed border-gray-100 text-center">
                                             <Text type="secondary" className="text-xs">

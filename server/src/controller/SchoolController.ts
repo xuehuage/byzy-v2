@@ -7,6 +7,7 @@ import { Class } from "../entity/Class"
 import { Grade } from "../entity/Grade"
 import { Student } from "../entity/Student"
 import { Product } from "../entity/Product"
+import { AfterSalesRecord, AfterSalesStatus } from "../entity/AfterSalesRecord"
 
 export class SchoolController {
     static async getAll(req: Request, res: Response) {
@@ -235,10 +236,22 @@ export class SchoolController {
 
             const orders = await queryBuilder.getMany()
 
-            const result = orders.map(order => {
-                const summerQty = order.items.filter((i: OrderItem) => i.product.type === 0).reduce((sum: number, i: OrderItem) => sum + i.quantity, 0)
-                const springQty = order.items.filter((i: OrderItem) => i.product.type === 1).reduce((sum: number, i: OrderItem) => sum + i.quantity, 0)
-                const winterQty = order.items.filter((i: OrderItem) => i.product.type === 2).reduce((sum: number, i: OrderItem) => sum + i.quantity, 0)
+            const result = await Promise.all(orders.map(async order => {
+                // Fetch processed refunds for this order
+                const refunds = await AppDataSource.getRepository(AfterSalesRecord).find({
+                    where: { orderId: order.id, status: AfterSalesStatus.PROCESSED, type: "REFUND" as any },
+                    relations: ["product"]
+                })
+
+                const getActualQty = (type: number) => {
+                    const originalQty = order.items
+                        .filter((i: OrderItem) => i.product.type === type)
+                        .reduce((sum: number, i: OrderItem) => sum + i.quantity, 0)
+                    const refundedQty = refunds
+                        .filter(r => r.product?.type === type)
+                        .reduce((sum, r) => sum + Number(r.newQuantity), 0)
+                    return Math.max(0, originalQty - refundedQty)
+                }
 
                 return {
                     gradeName: order.student.grade?.name || "未知年级",
@@ -246,13 +259,13 @@ export class SchoolController {
                     studentName: order.student.name,
                     idCard: order.student.idCard,
                     phone: order.student.phone,
-                    summerQty,
-                    springQty,
-                    winterQty,
+                    summerQty: getActualQty(0),
+                    springQty: getActualQty(1),
+                    winterQty: getActualQty(2),
                     totalAmount: order.totalAmount,
                     status: order.status
                 }
-            })
+            }))
 
             res.json({ code: 200, data: result })
         } catch (error) {

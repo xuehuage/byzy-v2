@@ -111,7 +111,7 @@ const OrderCenter: React.FC = () => {
                 <Space direction="vertical" size={0}>
                     {r.items?.map((item, idx) => (
                         <Text key={idx} type="secondary">
-                            {item.product?.name}: {item.size || '未填'} ({item.quantity}套)
+                            {item.product?.name}: {item.size || '未填'} ({item.quantity}套{item.refundedQuantity > 0 ? `，已退${item.refundedQuantity}套` : ''})
                         </Text>
                     ))}
                 </Space>
@@ -135,6 +135,7 @@ const OrderCenter: React.FC = () => {
                     'SHIPPED': { color: 'cyan', text: '已发货' },
                     'CANCELLED': { color: 'default', text: '已取消' },
                     'REFUNDING': { color: 'volcano', text: '退款中' },
+                    'PARTIAL_REFUNDED': { color: 'purple', text: '部分退款' },
                     'REFUNDED': { color: 'red', text: '已退款' }
                 };
                 const config = map[status] || { color: 'default', text: status };

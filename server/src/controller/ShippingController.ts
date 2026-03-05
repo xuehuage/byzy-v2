@@ -35,10 +35,9 @@ export class ShippingController {
                     .innerJoin('order.student', 'student')
                     .innerJoin('student.grade', 'grade')
                     .innerJoin('grade.school', 'school')
-                    .innerJoinAndSelect('order.items', 'item')
-                    .innerJoinAndSelect('item.product', 'product')
+                    .leftJoinAndSelect('order.afterSales', 'asr', 'asr.status = :asrProcessed AND asr.type = :asrRefund', { asrProcessed: AfterSalesStatus.PROCESSED, asrRefund: 'REFUND' })
                     .where('school.id = :schoolId', { schoolId: school.id })
-                    .andWhere('order.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING] })
+                    .andWhere('order.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING, OrderStatus.PARTIAL_REFUNDED] })
                     .getMany()
 
                 if (orders.length === 0) continue // 无待发货订单则跳过
@@ -48,7 +47,13 @@ export class ShippingController {
                 for (const order of orders) {
                     for (const item of order.items) {
                         const t = item.product?.type ?? -1
-                        qtySummary[t] = (qtySummary[t] || 0) + item.quantity
+                        // Subtract processed refunds for this specific product
+                        const refundedQty = (order.afterSales || [])
+                            .filter(asr => asr.productId === item.product?.id)
+                            .reduce((sum, asr) => sum + Number(asr.newQuantity), 0)
+
+                        const actualQty = Math.max(0, item.quantity - refundedQty)
+                        qtySummary[t] = (qtySummary[t] || 0) + actualQty
                     }
                 }
 
@@ -102,6 +107,16 @@ export class ShippingController {
 
                 return order.items.map(item => {
                     const isExchanging = order.status === OrderStatus.EXCHANGING
+
+                    // Calculate refunded quantity for this item
+                    const refundedQty = (order.afterSales || [])
+                        .filter(asr => asr.productId === item.product?.id && asr.type === 'REFUND' && asr.status === AfterSalesStatus.PROCESSED)
+                        .reduce((sum, r) => sum + Number(r.newQuantity), 0)
+
+                    const actualQty = (isExchanging && asr?.newQuantity !== undefined)
+                        ? asr.newQuantity
+                        : Math.max(0, item.quantity - refundedQty)
+
                     return {
                         orderNo: order.orderNo,
                         studentName: order.student?.name || '',
@@ -109,15 +124,13 @@ export class ShippingController {
                         className: order.student?.class?.name || '未分班',
                         birthday: order.student?.birthday || '',
                         productType: productTypeNames[item.product?.type] || '校服',
-                        // If exchanging, use new size; otherwise use original
                         size: (isExchanging && asr?.newSize) ? asr.newSize : (item.size || '—'),
                         isSpecialSize: item.isSpecialSize ? '是' : '否',
                         height: item.height || '',
                         weight: item.weight || '',
-                        // If exchanging, use new quantity; otherwise use original
-                        quantity: (isExchanging && asr?.newQuantity !== undefined) ? asr.newQuantity : item.quantity,
+                        quantity: actualQty,
                         totalAmount: (order.totalAmount / 100).toFixed(2),
-                        status: isExchanging ? '调换' : '增订'
+                        status: isExchanging ? '调换' : (refundedQty > 0 ? '部分退款' : '增订')
                     }
                 })
             })
@@ -144,7 +157,7 @@ export class ShippingController {
                     .innerJoin('o.student', 's')
                     .innerJoin('s.grade', 'g')
                     .where('g.school_id = :schoolId', { schoolId })
-                    .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING] })
+                    .andWhere('o.status IN (:...statuses)', { statuses: [OrderStatus.PAID, OrderStatus.EXCHANGING, OrderStatus.PARTIAL_REFUNDED] })
 
                 const rawOrders = await subQuery.getMany()
                 const orderIds = rawOrders.map(o => o.id)
