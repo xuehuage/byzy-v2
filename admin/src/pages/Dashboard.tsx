@@ -226,12 +226,13 @@ const Dashboard: React.FC = () => {
             title: '总销售额 (元)',
             dataIndex: 'totalAmount',
             key: 'totalAmount',
-            align: 'right',
+            align: 'center',
             render: (val: number) => <strong style={{ fontSize: '15px' }}>¥ {val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
         },
         {
             title: '操作',
             key: 'action',
+            align: 'right',
             render: (_, record) => (
                 <Space>
                     <Popconfirm
