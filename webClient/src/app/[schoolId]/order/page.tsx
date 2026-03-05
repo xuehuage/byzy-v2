@@ -362,6 +362,14 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
             >
                 <div className="p-8 font-sans">
                     <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-8"></div>
+                    {/* 
+                    <div className="mb-10 text-center animate-fadeIn">
+                        <span className="text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] block mb-2">订单总计</span>
+                        <div className="flex items-center justify-center gap-1">
+                            <span className="text-red-500 text-2xl font-black">¥</span>
+                            <span className="text-red-500 text-5xl font-black tracking-tighter">{calculateTotal().toFixed(2)}</span>
+                        </div>
+                    </div> */}
 
                     <div className="space-y-6 mb-10">
 

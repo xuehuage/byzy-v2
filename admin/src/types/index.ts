@@ -64,6 +64,7 @@ export interface SchoolStats {
     summerQty: number
     autumnQty: number
     winterQty: number
+    totalRefundedQty?: number
     totalRevenue: number
     paidAmount: number
     unpaidAmount: number

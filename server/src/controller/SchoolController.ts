@@ -172,9 +172,14 @@ export class SchoolController {
 
             // Transformation and Formula-based Revenue Calculation
             const result = schools.map(s => {
-                const summerQty = Math.max(0, Number(s.summerQty || 0) - Number(s.summerQtyRefund || 0))
-                const autumnQty = Math.max(0, Number(s.autumnQty || 0) - Number(s.autumnQtyRefund || 0))
-                const winterQty = Math.max(0, Number(s.winterQty || 0) - Number(s.winterQtyRefund || 0))
+                const summerQtyRefund = Number(s.summerQtyRefund || 0)
+                const autumnQtyRefund = Number(s.autumnQtyRefund || 0)
+                const winterQtyRefund = Number(s.winterQtyRefund || 0)
+                const totalRefundedQty = summerQtyRefund + autumnQtyRefund + winterQtyRefund
+
+                const summerQty = Math.max(0, Number(s.summerQty || 0) - summerQtyRefund)
+                const autumnQty = Math.max(0, Number(s.autumnQty || 0) - autumnQtyRefund)
+                const winterQty = Math.max(0, Number(s.winterQty || 0) - winterQtyRefund)
 
                 const summerPrice = Number(s.summerPrice || 0)
                 const autumnPrice = Number(s.autumnPrice || 0)
@@ -192,6 +197,7 @@ export class SchoolController {
                     summerQty,
                     autumnQty,
                     winterQty,
+                    totalRefundedQty,
                     // Use calculated revenue for both total and paid if appropriate, 
                     // or keep actual paidAmount but calculate totalRevenue via formula.
                     // User said: "单个学校的销售金额等于该学校夏装套数*夏装单价+秋装套数*秋装单价+冬装套数*冬装单价"

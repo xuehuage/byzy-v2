@@ -1,5 +1,5 @@
-import React from 'react'
-import { Layout, Menu, Avatar, Dropdown, theme } from 'antd'
+import React, { useEffect, useState } from 'react'
+import { Layout, Menu, Avatar, Dropdown, theme, Badge } from 'antd'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
     DashboardOutlined,
@@ -11,6 +11,7 @@ import {
     TruckOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../store/authStore'
+import { getAfterSalesPendingRefundCount } from '../services/api'
 
 const { Header, Sider, Content } = Layout
 
@@ -18,6 +19,24 @@ const AdminLayout: React.FC = () => {
     const navigate = useNavigate()
     const location = useLocation()
     const { user, logout } = useAuthStore()
+    const [pendingRefundCount, setPendingRefundCount] = useState(0)
+
+    useEffect(() => {
+        const fetchBadgeCount = async () => {
+            try {
+                const res = await getAfterSalesPendingRefundCount()
+                if (res.data.code === 200) {
+                    setPendingRefundCount(res.data.data)
+                }
+            } catch (error) {
+                console.error("Fetch badge count failed", error)
+            }
+        }
+        fetchBadgeCount()
+        // Optional: polling if real-time is strictly required
+        const timer = setInterval(fetchBadgeCount, 30000)
+        return () => clearInterval(timer)
+    }, [])
 
     const {
         token: { colorBgContainer },
@@ -62,8 +81,13 @@ const AdminLayout: React.FC = () => {
         },
         {
             key: '/after-sales',
-            icon: <UserOutlined />, // Just a placeholder icon
-            label: '售后服务中心',
+            icon: <UserOutlined />,
+            label: (
+                <div className="flex justify-between items-center pr-4">
+                    <span>售后服务中心</span>
+                    <Badge count={pendingRefundCount} offset={[10, 0]} size="small" />
+                </div>
+            ),
             onClick: () => navigate('/after-sales'),
         },
         // --- V1 Navigation (Preserved) ---

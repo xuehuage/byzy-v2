@@ -7,13 +7,16 @@ import { PaymentService } from "../services/PaymentService"
 export class AfterSalesController {
     static async getAll(req: Request, res: Response) {
         try {
-            const { page = 1, pageSize = 10, status } = req.query
+            const { page = 1, pageSize = 10, status, schoolId, keyword } = req.query
             const skip = (Number(page) - 1) * Number(pageSize)
             const take = Number(pageSize)
 
             const queryBuilder = AppDataSource.getRepository(AfterSalesRecord).createQueryBuilder("record")
                 .leftJoinAndSelect("record.order", "order")
                 .leftJoinAndSelect("order.student", "student")
+                .leftJoinAndSelect("student.class", "class")
+                .leftJoinAndSelect("student.grade", "grade")
+                .leftJoinAndSelect("grade.school", "school")
                 .leftJoinAndSelect("order.items", "items")
                 .leftJoinAndSelect("items.product", "product")
                 .leftJoinAndSelect("record.product", "recordProduct")
@@ -21,8 +24,16 @@ export class AfterSalesController {
                 .skip(skip)
                 .take(take)
 
-            if (status && status !== 'all') {
+            if (status && status !== 'ALL' && status !== 'all') {
                 queryBuilder.andWhere("record.status = :status", { status })
+            }
+
+            if (schoolId && schoolId !== 'all') {
+                queryBuilder.andWhere("school.id = :schoolId", { schoolId: Number(schoolId) })
+            }
+
+            if (keyword) {
+                queryBuilder.andWhere("(student.name LIKE :keyword OR order.orderNo LIKE :keyword)", { keyword: `%${keyword}%` })
             }
 
             const [list, total] = await queryBuilder.getManyAndCount()
@@ -203,6 +214,21 @@ export class AfterSalesController {
             }
 
             res.status(500).json({ code: 500, message: msg || "Internal server error" })
+        }
+    }
+
+    static async getPendingRefundCount(req: Request, res: Response) {
+        try {
+            const count = await AppDataSource.getRepository(AfterSalesRecord).count({
+                where: {
+                    status: AfterSalesStatus.PENDING,
+                    type: "REFUND" as any
+                }
+            })
+            res.json({ code: 200, data: count })
+        } catch (error) {
+            console.error("Get pending refund count error:", error)
+            res.status(500).json({ code: 500, message: "Internal server error" })
         }
     }
 }

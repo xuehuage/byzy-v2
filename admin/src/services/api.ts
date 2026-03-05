@@ -80,8 +80,12 @@ export const uploadImage = (formData: FormData) => {
     })
 }
 
-export const getAfterSalesList = (params: { page: number, pageSize: number, status?: string }) => {
+export const getAfterSalesList = (params: { page: number, pageSize: number, status?: string, schoolId?: number, keyword?: string }) => {
     return request.get<ApiResponse<{ list: AfterSalesRecord[], total: number }>>('/after-sales', { params })
+}
+
+export const getAfterSalesPendingRefundCount = () => {
+    return request.get<ApiResponse<number>>('/after-sales/pending-refund-count')
 }
 
 export const approveAfterSales = (id: number) => {

@@ -15,6 +15,7 @@ interface SchoolSaleRecord {
     summerQty: number;
     autumnQty: number;
     winterQty: number;
+    refundedQty: number;
     totalAmount: number;
 }
 
@@ -36,9 +37,10 @@ const Dashboard: React.FC = () => {
                     key: item.id.toString(),
                     schoolName: item.name,
                     summerQty: item.summerQty || 0,
-                    autumnQty: item.autumnQty || 0, // Backend now uses autumnQty
+                    autumnQty: item.autumnQty || 0,
                     winterQty: item.winterQty || 0,
-                    totalAmount: item.paidAmount || 0, // Backend already converted to 元
+                    refundedQty: item.totalRefundedQty || 0,
+                    totalAmount: item.paidAmount || 0,
                 }));
                 setData(mappedData);
             }
@@ -101,6 +103,13 @@ const Dashboard: React.FC = () => {
             key: 'winterQty',
             align: 'center',
             render: (val: number) => <span style={{ color: '#13c2c2' }}>{val.toLocaleString()}</span>
+        },
+        {
+            title: '已退款 (套)',
+            dataIndex: 'refundedQty',
+            key: 'refundedQty',
+            align: 'center',
+            render: (val: number) => <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{val > 0 ? val.toLocaleString() : '-'}</span>
         },
         {
             title: '总销售额 (元)',

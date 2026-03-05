@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Tag, Button, Modal, Descriptions, message, Typography, Badge, Tabs, Input } from 'antd';
+import { Table, Tag, Button, Modal, Descriptions, message, Typography, Badge, Select, Input, Space } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { getAfterSalesList, approveAfterSales, rejectAfterSales } from '../services/api';
-import type { AfterSalesRecord } from '../types';
+import { getAfterSalesList, approveAfterSales, rejectAfterSales, getSchoolList } from '../services/api';
+import type { AfterSalesRecord, School } from '../types';
 
 const { Text } = Typography;
 
@@ -15,24 +15,35 @@ function getProductName(product?: any) {
 }
 
 
+const { Option } = Select;
+
 const AfterSales: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState<AfterSalesRecord[]>([]);
+    const [schools, setSchools] = useState<School[]>([]);
     const [total, setTotal] = useState(0);
     const [pagination, setPagination] = useState({ page: 1, pageSize: 10 });
-    const [activeTab, setActiveTab] = useState('ALL');
-    const [search, setSearch] = useState('');
+    const [filters, setFilters] = useState<{ status: string, schoolId?: number, keyword: string }>({
+        status: 'ALL',
+        schoolId: undefined,
+        keyword: ''
+    });
 
     // Modal state for detail
     const [selectedRecord, setSelectedRecord] = useState<AfterSalesRecord | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
 
-    const fetchData = async (page = pagination.page, status = activeTab) => {
+    const fetchData = async (page = pagination.page) => {
         setLoading(true);
         try {
-            const params: any = { page, pageSize: pagination.pageSize };
-            if (status !== 'ALL') params.status = status;
+            const params: any = {
+                page,
+                pageSize: pagination.pageSize,
+                status: filters.status,
+                schoolId: filters.schoolId,
+                keyword: filters.keyword
+            };
 
             const res = await getAfterSalesList(params);
             if (res.data.code === 200) {
@@ -46,9 +57,22 @@ const AfterSales: React.FC = () => {
         }
     };
 
+    const fetchSchools = async () => {
+        try {
+            const res = await getSchoolList();
+            if (res.data.code === 200) setSchools(res.data.data);
+        } catch (error) {
+            console.error("Fetch schools failed", error);
+        }
+    };
+
     useEffect(() => {
-        fetchData();
-    }, [activeTab]);
+        fetchSchools();
+    }, []);
+
+    useEffect(() => {
+        fetchData(1);
+    }, [filters.status, filters.schoolId]);
 
     const handleAction = async (id: number, action: 'approve' | 'reject') => {
         setProcessing(true);
@@ -69,11 +93,20 @@ const AfterSales: React.FC = () => {
     };
 
     const columns: ColumnsType<AfterSalesRecord> = [
-        { title: '售后单号', dataIndex: 'id', key: 'id', width: 100 },
         {
-            title: '关联订单',
-            key: 'orderNo',
-            render: (_, r) => r.order?.orderNo || `#${r.orderId}`
+            title: '学校',
+            key: 'school',
+            render: (_, r) => (r.order?.student as any)?.class?.grade?.school?.name || '-'
+        },
+        {
+            title: '年级/班级',
+            key: 'class',
+            render: (_, r) => {
+                const student = r.order?.student as any;
+                const grade = student?.grade?.name || student?.class?.grade?.name || '';
+                const cls = student?.class?.name || '';
+                return `${grade} ${cls}`.trim() || '-';
+            }
         },
         { title: '学生姓名', key: 'student', render: (_, r) => r.order?.student?.name || '-' },
         {
@@ -114,6 +147,11 @@ const AfterSales: React.FC = () => {
                 return <Text type="secondary">{name} {r.newQuantity} 套</Text>;
             }
         },
+        {
+            title: '已退款 (套)',
+            key: 'refundedQty',
+            render: (_, r) => r.type === 'REFUND' && r.status === 'PROCESSED' ? <Text type="danger">{r.newQuantity}</Text> : '-'
+        },
         { title: '申请时间', dataIndex: 'createdAt', key: 'createdAt', render: (val) => new Date(val).toLocaleString() },
         {
             title: '操作',
@@ -128,30 +166,43 @@ const AfterSales: React.FC = () => {
 
     return (
         <div className="p-6 bg-white shadow-sm rounded-lg min-h-full">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800">售后服务中心</h1>
                     <p className="text-gray-500 mt-1">处理调换尺码与退款申请</p>
                 </div>
-                <Input
-                    placeholder="搜索订单号/姓名..."
-                    prefix={<SearchOutlined />}
-                    style={{ width: 250 }}
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                />
+                <Space wrap>
+                    <Select
+                        placeholder="选择学校"
+                        style={{ width: 180 }}
+                        allowClear
+                        value={filters.schoolId}
+                        onChange={val => setFilters(f => ({ ...f, schoolId: val }))}
+                    >
+                        {schools.map(s => <Option key={s.id} value={s.id}>{s.name}</Option>)}
+                    </Select>
+                    <Select
+                        placeholder="状态"
+                        style={{ width: 120 }}
+                        value={filters.status}
+                        onChange={val => setFilters(f => ({ ...f, status: val }))}
+                    >
+                        <Option value="ALL">全部状态</Option>
+                        <Option value="PENDING">待处理</Option>
+                        <Option value="PROCESSED">已完成</Option>
+                        <Option value="REJECTED">已驳回</Option>
+                    </Select>
+                    <Input
+                        placeholder="搜索姓名/订单号..."
+                        prefix={<SearchOutlined />}
+                        style={{ width: 220 }}
+                        value={filters.keyword}
+                        onChange={e => setFilters(f => ({ ...f, keyword: e.target.value }))}
+                        onPressEnter={() => fetchData(1)}
+                    />
+                    <Button type="primary" onClick={() => fetchData(1)}>查询</Button>
+                </Space>
             </div>
-
-            <Tabs
-                activeKey={activeTab}
-                onChange={setActiveTab}
-                items={[
-                    { key: 'ALL', label: '全部' },
-                    { key: 'PENDING', label: '待处理' },
-                    { key: 'PROCESSED', label: '已完成' },
-                    { key: 'REJECTED', label: '已驳回' },
-                ]}
-            />
 
             <Table
                 columns={columns}

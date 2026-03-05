@@ -32,6 +32,7 @@ router.put("/schools/:id/config", auth, SchoolController.updateConfig)
 router.post("/upload", auth, upload.single('image'), UploadController.uploadImage)
 // After-sales (protected)
 router.get("/after-sales", auth, AfterSalesController.getAll)
+router.get("/after-sales/pending-refund-count", auth, AfterSalesController.getPendingRefundCount)
 router.put("/after-sales/:id/approve", auth, AfterSalesController.approve)
 router.put("/after-sales/:id/reject", auth, AfterSalesController.reject)
 
