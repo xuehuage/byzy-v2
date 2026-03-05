@@ -43,6 +43,12 @@ export class School {
     @Column({ name: 'winter_price', type: 'int', default: 0, comment: "Price in cents" })
     winterPrice!: number
 
+    @Column({ name: 'after_sales_exchange_active', type: 'tinyint', default: 1 })
+    afterSalesExchangeActive!: boolean
+
+    @Column({ name: 'after_sales_refund_active', type: 'tinyint', default: 1 })
+    afterSalesRefundActive!: boolean
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date
 

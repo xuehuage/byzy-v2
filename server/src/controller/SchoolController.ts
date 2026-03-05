@@ -278,7 +278,9 @@ export class SchoolController {
                     isWinterActive: !!school.isWinterActive,
                     summerPrice: school.summerPrice,
                     autumnPrice: school.autumnPrice,
-                    winterPrice: school.winterPrice
+                    winterPrice: school.winterPrice,
+                    afterSalesExchangeActive: !!school.afterSalesExchangeActive,
+                    afterSalesRefundActive: !!school.afterSalesRefundActive
                 }
             })
         } catch (error) {
@@ -298,7 +300,8 @@ export class SchoolController {
             const {
                 summerImage, autumnImage, winterImage, sizeGuideImage,
                 isSummerActive, isAutumnActive, isWinterActive,
-                summerPrice, autumnPrice, winterPrice
+                summerPrice, autumnPrice, winterPrice,
+                afterSalesExchangeActive, afterSalesRefundActive
             } = req.body
 
             if (summerImage !== undefined) school.summerImage = summerImage
@@ -313,6 +316,9 @@ export class SchoolController {
             if (summerPrice !== undefined) school.summerPrice = summerPrice
             if (autumnPrice !== undefined) school.autumnPrice = autumnPrice
             if (winterPrice !== undefined) school.winterPrice = winterPrice
+
+            if (afterSalesExchangeActive !== undefined) school.afterSalesExchangeActive = afterSalesExchangeActive
+            if (afterSalesRefundActive !== undefined) school.afterSalesRefundActive = afterSalesRefundActive
 
             await schoolRepository.save(school)
 

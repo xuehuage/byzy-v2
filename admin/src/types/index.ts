@@ -27,6 +27,8 @@ export interface SchoolConfig {
     summerPrice?: number
     autumnPrice?: number
     winterPrice?: number
+    afterSalesExchangeActive?: boolean
+    afterSalesRefundActive?: boolean
 }
 
 export interface AfterSalesRecord {
@@ -78,6 +80,8 @@ export interface SchoolStats {
     summerPrice?: number
     autumnPrice?: number
     winterPrice?: number
+    afterSalesExchangeActive?: boolean
+    afterSalesRefundActive?: boolean
 }
 
 export interface School {
@@ -117,10 +121,20 @@ export interface Order {
     student?: {
         name: string
         idCard: string
-        class?: {
+        phone?: string
+        grade?: {
             name: string
             school?: {
                 name: string
+            }
+        }
+        class?: {
+            name: string
+            grade?: {
+                name: string
+                school?: {
+                    name: string
+                }
             }
         }
     }

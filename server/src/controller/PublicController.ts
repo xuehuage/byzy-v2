@@ -34,10 +34,35 @@ export class PublicController {
                 else if (item.product?.type === 1) uType = 2; // 春秋装
                 else if (item.product?.type === 2) uType = 3; // 冬装
 
+                // Calculate processed refund quantity and detailed summaries for this specific product
+                const processedAfterSales = (order.afterSales || [])
+                    .filter((asr: any) => asr.status === 'PROCESSED' && asr.productId === item.product?.id);
+
+                const refundedQty = processedAfterSales
+                    .filter((asr: any) => asr.type === 'REFUND')
+                    .reduce((sum: number, asr: any) => sum + Number(asr.newQuantity), 0);
+
+                // Refund Amount: For processed refunds, it's (Quantity * Price)
+                const refundedAmount = processedAfterSales
+                    .filter(asr => asr.type === 'REFUND')
+                    .reduce((sum, asr) => sum + (Number(asr.newQuantity) * Number(item.priceSnapshot || 0)), 0);
+
+                const exchanges = processedAfterSales
+                    .filter(asr => asr.type === 'EXCHANGE')
+                    .map(asr => ({
+                        qty: asr.newQuantity,
+                        from: asr.originalSize,
+                        to: asr.newSize
+                    }));
+
                 return {
                     id: item.id,
+                    product_id: item.product?.id,
                     size: item.size || "以实际发放为准",
                     quantity: item.quantity,
+                    refunded_quantity: refundedQty,
+                    refunded_amount: refundedAmount,
+                    exchanges: exchanges,
                     price: (item.priceSnapshot || 0).toString(),
                     uniform_type: uType,
                     product_name: item.product?.name || (uType === 1 ? "夏季校服" : (uType === 2 ? "春秋校服" : "冬季校服"))
@@ -48,7 +73,7 @@ export class PublicController {
                 order_id: order.id,
                 order_no: order.orderNo,
                 total_amount: (order.totalAmount || 0).toString(),
-                // Robust payment_status mapping: anyone in a paid-related state is 'Paid' (1)
+                // Robust payment_status mapping
                 payment_status: [
                     OrderStatus.PAID,
                     OrderStatus.EXCHANGING,
@@ -59,7 +84,11 @@ export class PublicController {
                 order_status: order.status,
                 created_at: order.createdAt,
                 updated_at: order.updatedAt,
-                items: items
+                items: items,
+                after_sales_config: {
+                    exchange_active: !!order.student?.grade?.school?.afterSalesExchangeActive,
+                    refund_active: !!order.student?.grade?.school?.afterSalesRefundActive
+                }
             }
         })
     }
@@ -69,7 +98,14 @@ export class PublicController {
             const { idCard } = req.params
             const student = await AppDataSource.getRepository(Student).findOne({
                 where: { idCard },
-                relations: ["grade", "class", "orders", "orders.items", "orders.items.product"]
+                relations: [
+                    "grade",
+                    "class",
+                    "orders",
+                    "orders.items",
+                    "orders.items.product",
+                    "orders.afterSales"
+                ]
             })
 
             if (!student) return res.status(404).json({ code: 404, message: "未找到该学生信息" })
@@ -103,7 +139,15 @@ export class PublicController {
 
             const student = await AppDataSource.getRepository(Student).findOne({
                 where: whereClause,
-                relations: ["grade", "class", "orders", "orders.items", "orders.items.product"]
+                relations: [
+                    "grade",
+                    "grade.school",
+                    "class",
+                    "orders",
+                    "orders.items",
+                    "orders.items.product",
+                    "orders.afterSales"
+                ]
             })
 
             if (!student) return res.status(404).json({ code: 404, message: "未找到该学生信息" })
@@ -137,10 +181,12 @@ export class PublicController {
             const studentRepository = AppDataSource.getRepository(Student)
             const student = await studentRepository.createQueryBuilder("student")
                 .leftJoinAndSelect("student.grade", "grade")
+                .leftJoinAndSelect("grade.school", "school")
                 .leftJoinAndSelect("student.class", "class")
                 .leftJoinAndSelect("student.orders", "order")
                 .leftJoinAndSelect("order.items", "item")
                 .leftJoinAndSelect("item.product", "product")
+                .leftJoinAndSelect("order.afterSales", "afterSales")
                 .where("student.name = :name", { name })
                 .andWhere("student.phone = :phone", { phone })
                 .andWhere("student.birthday = :birthday", { birthday })
@@ -178,10 +224,12 @@ export class PublicController {
             const studentRepository = AppDataSource.getRepository(Student)
             const query = studentRepository.createQueryBuilder("student")
                 .leftJoinAndSelect("student.grade", "grade")
+                .leftJoinAndSelect("grade.school", "school")
                 .leftJoinAndSelect("student.class", "class")
                 .leftJoinAndSelect("student.orders", "order")
                 .leftJoinAndSelect("order.items", "item")
                 .leftJoinAndSelect("item.product", "product")
+                .leftJoinAndSelect("order.afterSales", "afterSales")
                 .where("student.phone = :phone", { phone: phone as string })
 
             if (schoolId) {

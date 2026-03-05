@@ -96,7 +96,10 @@ const AfterSales: React.FC = () => {
         {
             title: '学校',
             key: 'school',
-            render: (_, r) => (r.order?.student as any)?.class?.grade?.school?.name || '-'
+            render: (_, r) => {
+                const student = r.order?.student as any;
+                return student?.grade?.school?.name || student?.class?.grade?.school?.name || '-';
+            }
         },
         {
             title: '年级/班级',
@@ -236,7 +239,6 @@ const AfterSales: React.FC = () => {
             >
                 {selectedRecord && (
                     <Descriptions bordered column={1}>
-                        <Descriptions.Item label="售后单号">{selectedRecord.id}</Descriptions.Item>
                         <Descriptions.Item label="售后类型">
                             <Tag color={selectedRecord.type === 'REFUND' ? 'volcano' : 'geekblue'}>
                                 {selectedRecord.type === 'REFUND' ? '退款' : '换码'}

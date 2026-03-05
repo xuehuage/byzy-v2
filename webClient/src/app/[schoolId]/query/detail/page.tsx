@@ -36,6 +36,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
         maxQty: number;
         newSize: string;
         isSpecialSize: boolean;
+        qty: number;
         height?: string;
         weight?: string;
     } | null>(null);
@@ -87,7 +88,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                 height: exchangeModal?.height,
                 weight: exchangeModal?.weight,
                 original_quantity: primaryItem?.quantity ?? 1,
-                new_quantity: primaryItem?.quantity ?? 1,
+                new_quantity: exchangeModal?.qty || primaryItem?.quantity || 1,
             });
             message.success('调换申请已提交，请等待管理员处理');
             setExchangeModal(null);
@@ -216,7 +217,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                 <div className="flex-1">
                                                     <div className="flex justify-between">
                                                         <Text strong className="text-base text-gray-800">{uniformTypeText[item.uniform_type] || item.product_name}</Text>
-                                                        <Text strong className="text-gray-900">¥ {(Number(item.price) / 100).toFixed(2)}</Text>
+                                                        {/* <Text strong className="text-gray-900">¥ {(Number(item.price) / 100).toFixed(2)}</Text> */}
                                                     </div>
                                                     <div className="flex gap-4 mt-2">
                                                         <div className="px-2 py-0.5 bg-gray-100 rounded text-[11px] text-gray-500 font-medium">
@@ -244,49 +245,75 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
 
                                     {/* Actions */}
                                     {order.payment_status === 1 && order.order_status !== 'REFUNDING' && order.order_status !== 'EXCHANGING' && order.order_status !== 'REFUNDED' && (
-                                        <div className="flex gap-3 pt-6 mt-2 border-t border-dashed border-gray-100">
-                                            {/* Exchange allowed for PAID and SHIPPED */}
-                                            {(order.order_status === 'PAID' || order.order_status === 'SHIPPED') && (
-                                                <Button
-                                                    block
-                                                    icon={<SwapOutlined />}
-                                                    className="rounded-2xl h-12 font-bold text-sm text-blue-600 bg-blue-50 border-none hover:bg-blue-100 transition-all"
-                                                    onClick={() => {
-                                                        const primaryItem = order.items?.[0] || order;
-                                                        setExchangeModal({
-                                                            open: true,
-                                                            orderId: order.order_id || order.id,
-                                                            currentSize: primaryItem?.size,
-                                                            maxQty: primaryItem?.quantity,
-                                                            newSize: '160#',
-                                                            isSpecialSize: false
-                                                        });
-                                                    }}
-                                                >
-                                                    申请调换
-                                                </Button>
-                                            )}
-                                            {/* Refund ONLY allowed for PAID (not SHIPPED) */}
-                                            {order.order_status === 'PAID' && (
-                                                <Button
-                                                    block
-                                                    danger
-                                                    icon={<UndoOutlined />}
-                                                    className="rounded-2xl h-12 font-bold text-sm bg-red-50 border-none hover:bg-red-100 transition-all"
-                                                    onClick={() => {
-                                                        setRefundQty(1);
-                                                        const primaryItem = order.items?.[0] || order;
-                                                        setRefundModal({
-                                                            open: true,
-                                                            orderId: order.order_id || order.id,
-                                                            maxQty: primaryItem?.quantity || 1,
-                                                            orderName: order.items ? order.items.map((i: any) => uniformTypeText[i.uniform_type] || '校服').join(' + ') : '校服'
-                                                        });
-                                                    }}
-                                                >
-                                                    申请退款
-                                                </Button>
-                                            )}
+                                        <div className="flex flex-col gap-4 pt-6 mt-2 border-t border-dashed border-gray-100">
+                                            {/* Item-level After-Sales Status Text */}
+                                            {order.items.map((item: any, iidx: number) => (
+                                                <div key={`status-${iidx}`} className="space-y-1">
+                                                    {item.refunded_quantity > 0 && (
+                                                        <div className="text-[11px] text-green-600 font-bold bg-green-50 px-3 py-2 rounded-xl border border-green-100">
+                                                            已退款{uniformTypeText[item.uniform_type] || item.product_name}{item.refunded_quantity}套，退款金额：{(Number(item.refunded_amount || 0) / 100).toFixed(2)}元
+                                                        </div>
+                                                    )}
+                                                    {(item.exchanges || []).map((ex: any, eidx: number) => (
+                                                        <div key={`ex-${eidx}`} className="text-[11px] text-blue-600 font-bold bg-blue-50 px-3 py-2 rounded-xl border border-blue-100">
+                                                            已完成{uniformTypeText[item.uniform_type] || item.product_name}{ex.qty}套尺码调换，{ex.from} {'->'} {ex.to}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+
+                                            <div className="flex gap-3">
+                                                {/* Exchange allowed for PAID and SHIPPED, controlled by admin switch and per-item processed status */}
+                                                {(order.order_status === 'PAID' || order.order_status === 'SHIPPED') &&
+                                                    order.after_sales_config?.exchange_active !== false &&
+                                                    order.items.some((item: any) => !(item.exchanges?.length > 0)) && (
+                                                        <Button
+                                                            block
+                                                            icon={<SwapOutlined />}
+                                                            className="rounded-2xl h-12 font-bold text-sm text-blue-600 bg-blue-50 border-none hover:bg-blue-100 transition-all"
+                                                            onClick={() => {
+                                                                // Filter to items that haven't been exchanged yet
+                                                                const availableItem = order.items.find((item: any) => !(item.exchanges?.length > 0)) || order.items[0];
+                                                                setExchangeModal({
+                                                                    open: true,
+                                                                    orderId: order.order_id || order.id,
+                                                                    currentSize: availableItem?.size,
+                                                                    maxQty: availableItem?.quantity,
+                                                                    qty: availableItem?.quantity || 1,
+                                                                    newSize: '160#',
+                                                                    isSpecialSize: false
+                                                                });
+                                                            }}
+                                                        >
+                                                            申请调换
+                                                        </Button>
+                                                    )}
+                                                {/* Refund ONLY allowed for PAID (not SHIPPED), controlled by admin switch and remaining quantity */}
+                                                {order.order_status === 'PAID' &&
+                                                    order.after_sales_config?.refund_active !== false &&
+                                                    order.items.some((item: any) => (item.quantity - (item.refunded_quantity || 0)) > 0) && (
+                                                        <Button
+                                                            block
+                                                            danger
+                                                            icon={<UndoOutlined />}
+                                                            className="rounded-2xl h-12 font-bold text-sm bg-red-50 border-none hover:bg-red-100 transition-all"
+                                                            onClick={() => {
+                                                                // Find first item with remaining quantity
+                                                                const availableItem = order.items.find((item: any) => (item.quantity - (item.refunded_quantity || 0)) > 0) || order.items[0];
+                                                                const remainingQty = (availableItem?.quantity || 1) - (availableItem?.refunded_quantity || 0);
+                                                                setRefundQty(remainingQty > 0 ? 1 : 0);
+                                                                setRefundModal({
+                                                                    open: true,
+                                                                    orderId: order.order_id || order.id,
+                                                                    maxQty: remainingQty,
+                                                                    orderName: uniformTypeText[availableItem.uniform_type] || availableItem.product_name
+                                                                });
+                                                            }}
+                                                        >
+                                                            申请退款
+                                                        </Button>
+                                                    )}
+                                            </div>
                                         </div>
                                     )}
                                     {(order.order_status === 'REFUNDING' || order.order_status === 'EXCHANGING') && (
@@ -394,11 +421,19 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                         )}
                     </div>
 
-                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                        <div className="text-amber-700 text-[10px] font-bold uppercase tracking-widest mb-1">温馨提示</div>
-                        <Text className="text-amber-800/70 text-xs leading-relaxed">
-                            申请提交后，请保持手机畅通。管理员将核实库存后为您处理调换。特殊尺码通常需要更长的备货时间。
-                        </Text>
+                    <div>
+                        <Text type="secondary" style={{ fontSize: '11px' }} className="block mb-2 px-1 font-bold uppercase">换货套数 (最大 {exchangeModal?.maxQty || 1} 套)</Text>
+                        <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                            <InputNumber
+                                min={1}
+                                max={exchangeModal?.maxQty || 1}
+                                value={exchangeModal?.qty}
+                                onChange={(v) => setExchangeModal(prev => prev ? { ...prev, qty: v || 1 } : null)}
+                                size="large"
+                                className="w-full rounded-xl border-none bg-transparent"
+                            />
+                            <Text className="text-gray-400 font-bold pr-2">套</Text>
+                        </div>
                     </div>
                 </div>
 
@@ -435,7 +470,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                     </div>
                     <div>
                         <Text type="secondary" className="text-sm block mb-3">
-                            申请退款套数（已购 {refundModal?.maxQty} 套）
+                            申请退款套数（剩余可退 {refundModal?.maxQty} 套）
                         </Text>
                         <div className="flex items-center gap-4">
                             <InputNumber

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
     Tabs, Card, Button, Modal, Form, Input, Table, Space,
-    Tag, Select, Upload, Row, Col, Typography, message, Badge, Empty, Collapse
+    Tag, Select, Upload, Row, Col, Typography, message, Badge, Empty, Collapse, Switch
 } from 'antd';
 import {
     BankOutlined, TeamOutlined, PlusOutlined, DownloadOutlined,
     UploadOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
-    CloseCircleOutlined, EditOutlined
+    CloseCircleOutlined, EditOutlined, SettingOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
-    getSchoolList, batchCreateSchool, batchUpdateSchool, rosterPreview, rosterApply
+    getSchoolList, batchCreateSchool, batchUpdateSchool, rosterPreview, rosterApply,
+    getSchoolConfig, updateSchoolConfig
 } from '../services/api';
 import type { School } from '../types';
 import * as ExcelJS from 'exceljs';
@@ -29,6 +30,12 @@ const SchoolMgmt: React.FC = () => {
     const [editingSchool, setEditingSchool] = useState<School | null>(null);
     const [createForm] = Form.useForm();
     const [creating, setCreating] = useState(false);
+
+    // After-Sales Toggle State
+    const [isAfterSalesModalOpen, setIsAfterSalesModalOpen] = useState(false);
+    const [afterSalesLoading, setAfterSalesLoading] = useState(false);
+    const [afterSalesForm] = Form.useForm();
+    const [configSchoolId, setConfigSchoolId] = useState<number | null>(null);
 
     // Tab 2: Roster State
     const [targetSchoolId, setTargetSchoolId] = useState<number | null>(null);
@@ -131,6 +138,42 @@ const SchoolMgmt: React.FC = () => {
         }
     };
 
+    const handleOpenAfterSalesModal = async (school: School) => {
+        setConfigSchoolId(school.id);
+        setIsAfterSalesModalOpen(true);
+        setAfterSalesLoading(true);
+        try {
+            const res = await getSchoolConfig(school.id);
+            if (res.data.code === 200) {
+                afterSalesForm.setFieldsValue({
+                    afterSalesExchangeActive: res.data.data.afterSalesExchangeActive ?? true,
+                    afterSalesRefundActive: res.data.data.afterSalesRefundActive ?? true,
+                });
+            }
+        } catch (error) {
+            message.error('获取配置失败');
+        } finally {
+            setAfterSalesLoading(false);
+        }
+    };
+
+    const handleUpdateAfterSales = async () => {
+        if (!configSchoolId) return;
+        try {
+            const values = await afterSalesForm.validateFields();
+            setAfterSalesLoading(true);
+            const res = await updateSchoolConfig(configSchoolId, values);
+            if (res.data.code === 200) {
+                message.success('配置已更新');
+                setIsAfterSalesModalOpen(false);
+            }
+        } catch (error) {
+            message.error('更新配置失败');
+        } finally {
+            setAfterSalesLoading(false);
+        }
+    };
+
     const schoolColumns: ColumnsType<School> = [
         { title: '学校名称', dataIndex: 'name', key: 'name', render: (text) => <Text strong>{text}</Text> },
         {
@@ -157,12 +200,18 @@ const SchoolMgmt: React.FC = () => {
                     >
                         编辑
                     </Button>
+                    <Button
+                        size="small"
+                        type="link"
+                        icon={<SettingOutlined />}
+                        onClick={(e) => { e.stopPropagation(); handleOpenAfterSalesModal(record); }}
+                    >
+                        售后开关
+                    </Button>
                 </Space>
             ),
         },
     ];
-
-    // Removed generateDisplayData and classColumns as they are replaced by hierarchical Collapse UI
 
     // --- Tab 2: Roster Matching Logic ---
     const handleDownloadTemplate = () => {
@@ -600,6 +649,37 @@ const SchoolMgmt: React.FC = () => {
                         </Form.List>
                     </div>
                 </Form>
+            </Modal>
+
+            {/* After-Sales Control Modal */}
+            <Modal
+                title={<Space><SettingOutlined className="text-blue-500" />售后功能开关控制</Space>}
+                open={isAfterSalesModalOpen}
+                onCancel={() => setIsAfterSalesModalOpen(false)}
+                onOk={handleUpdateAfterSales}
+                confirmLoading={afterSalesLoading}
+                destroyOnClose
+                centered
+            >
+                <div className="py-2">
+                    <Text type="secondary" className="block mb-6">控制该学校客户端详情页中“申请调换”与“申请退款”按钮的可见性。</Text>
+                    <Form form={afterSalesForm} layout="horizontal" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
+                        <Form.Item
+                            name="afterSalesExchangeActive"
+                            label="允许申请调换"
+                            valuePropName="checked"
+                        >
+                            <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
+                        </Form.Item>
+                        <Form.Item
+                            name="afterSalesRefundActive"
+                            label="允许申请退款"
+                            valuePropName="checked"
+                        >
+                            <Switch checkedChildren="显示" unCheckedChildren="隐藏" />
+                        </Form.Item>
+                    </Form>
+                </div>
             </Modal>
         </div>
     );
