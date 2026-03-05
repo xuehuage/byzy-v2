@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeftOutlined, SwapOutlined, UndoOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ShoppingOutlined, SwapOutlined, UndoOutlined, CheckCircleOutlined, InfoCircleOutlined, PlusOutlined, MinusOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { Typography, Tag, Card, Button, Empty, message, Modal, Input, InputNumber } from 'antd';
 import { Picker, Divider } from 'antd-mobile';
 import Footer from '@/components/Footer';
@@ -122,6 +122,23 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
         }
     };
 
+    const handleCancelAfterSales = async (asrId: number, orderId: number) => {
+        setActionLoading(true);
+        try {
+            await axiosInstance.post(`/after-sales/${asrId}/cancel`);
+            message.success('申请已成功取消');
+            // Refresh data to reflect status change
+            const res = await axiosInstance.get(`/public/student/${student.id}`, { params: { schoolId: student.schoolId } });
+            if (res.data.code === 200) {
+                setStudentData(res.data.data);
+            }
+        } catch (err: any) {
+            message.error(err.message || '取消失败');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     if (!studentData) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -189,9 +206,29 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                         <Text strong className="text-sm font-mono text-gray-700">{order.order_no}</Text>
                                     </div>
                                     {order.order_status === 'REFUNDING' ? (
-                                        <Tag color="orange" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">退款审核中</Tag>
+                                        <div className="flex items-center gap-2">
+                                            <Tag color="orange" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">退款审核中</Tag>
+                                            {order.pending_after_sales?.length > 0 && (
+                                                <button
+                                                    onClick={() => handleCancelAfterSales(order.pending_after_sales[0].id, order.order_id)}
+                                                    className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
+                                                >
+                                                    <CloseCircleOutlined /> 取消
+                                                </button>
+                                            )}
+                                        </div>
                                     ) : order.order_status === 'EXCHANGING' ? (
-                                        <Tag color="blue" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">调换审核中</Tag>
+                                        <div className="flex items-center gap-2">
+                                            <Tag color="blue" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">调换审核中</Tag>
+                                            {order.pending_after_sales?.length > 0 && (
+                                                <button
+                                                    onClick={() => handleCancelAfterSales(order.pending_after_sales[0].id, order.order_id)}
+                                                    className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1"
+                                                >
+                                                    <CloseCircleOutlined /> 取消
+                                                </button>
+                                            )}
+                                        </div>
                                     ) : order.order_status === 'SHIPPED' ? (
                                         <Tag color="cyan" className="rounded-full border-none px-4 py-1 font-bold text-xs m-0 shadow-sm">已发货</Tag>
                                     ) : order.order_status === 'REFUNDED' ? (

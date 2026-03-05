@@ -1,6 +1,6 @@
 import { Request, Response } from "express"
 import { AppDataSource } from "../data-source"
-import { AfterSalesRecord, AfterSalesStatus } from "../entity/AfterSalesRecord"
+import { AfterSalesRecord, AfterSalesStatus, AfterSalesType } from "../entity/AfterSalesRecord"
 import { Order, OrderStatus } from "../entity/Order"
 import { PaymentService } from "../services/PaymentService"
 
@@ -243,6 +243,50 @@ export class AfterSalesController {
             res.json({ code: 200, data: count })
         } catch (error) {
             console.error("Get pending refund count error:", error)
+            res.status(500).json({ code: 500, message: "Internal server error" })
+        }
+    }
+
+    static async cancel(req: Request, res: Response) {
+        try {
+            const id = parseInt(req.params.id)
+            const recordRepository = AppDataSource.getRepository(AfterSalesRecord)
+            const record = await recordRepository.findOne({
+                where: { id },
+                relations: ["order"]
+            })
+
+            if (!record) return res.status(404).json({ code: 404, message: "记录不存在" })
+            if (record.status !== AfterSalesStatus.PENDING) return res.status(400).json({ code: 400, message: "只有待审核的状态可以取消" })
+
+            record.status = AfterSalesStatus.CANCELLED
+            await recordRepository.save(record)
+
+            // Revert order status if no other pending after-sales
+            const otherPending = await recordRepository.countBy({
+                orderId: record.orderId,
+                status: AfterSalesStatus.PENDING
+            })
+
+            if (otherPending === 0) {
+                if (record.order.status === OrderStatus.EXCHANGING || record.order.status === OrderStatus.REFUNDING) {
+                    if (record.order.shippedAt) {
+                        record.order.status = OrderStatus.SHIPPED
+                    } else {
+                        const processedRefundsCount = await recordRepository.countBy({
+                            orderId: record.orderId,
+                            status: AfterSalesStatus.PROCESSED,
+                            type: AfterSalesType.REFUND
+                        })
+                        record.order.status = processedRefundsCount > 0 ? OrderStatus.PARTIAL_REFUNDED : OrderStatus.PAID
+                    }
+                    await AppDataSource.getRepository(Order).save(record.order)
+                }
+            }
+
+            res.json({ code: 200, message: "取消成功" })
+        } catch (error) {
+            console.error("Cancel after-sales error:", error)
             res.status(500).json({ code: 500, message: "Internal server error" })
         }
     }

@@ -10,7 +10,8 @@ export enum AfterSalesType {
 export enum AfterSalesStatus {
     PENDING = "PENDING",
     PROCESSED = "PROCESSED",
-    REJECTED = "REJECTED"
+    REJECTED = "REJECTED",
+    CANCELLED = "CANCELLED"
 }
 
 @Entity("after_sales_records")

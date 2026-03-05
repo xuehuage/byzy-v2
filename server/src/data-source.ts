@@ -11,6 +11,7 @@ import { Terminal } from "./entity/Terminal"
 import { AfterSalesRecord } from "./entity/AfterSalesRecord"
 import { OrderTemp } from "./entity/OrderTemp"
 import { Grade } from "./entity/Grade"
+import { ShipmentBatch } from "./entity/ShipmentBatch"
 import dotenv from "dotenv"
 
 dotenv.config()
@@ -24,7 +25,7 @@ export const AppDataSource = new DataSource({
     database: process.env.DB_NAME || "byzy_v2",
     synchronize: false,
     logging: false,
-    entities: [AdminUser, School, Product, Class, Grade, Student, Order, OrderItem, Terminal, AfterSalesRecord, OrderTemp],
+    entities: [AdminUser, School, Product, Class, Grade, Student, Order, OrderItem, Terminal, AfterSalesRecord, OrderTemp, ShipmentBatch],
     migrations: [],
     subscribers: [],
 })

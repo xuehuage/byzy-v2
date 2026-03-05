@@ -86,6 +86,14 @@ export class PublicController {
                 created_at: order.createdAt,
                 updated_at: order.updatedAt,
                 items: items,
+                pending_after_sales: (order.afterSales || [])
+                    .filter(asr => asr.status === 'PENDING')
+                    .map(asr => ({
+                        id: asr.id,
+                        type: asr.type,
+                        qty: asr.newQuantity,
+                        size: asr.newSize
+                    })),
                 after_sales_config: {
                     exchange_active: !!student.grade?.school?.afterSalesExchangeActive,
                     refund_active: !!student.grade?.school?.afterSalesRefundActive
