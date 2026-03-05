@@ -207,8 +207,8 @@ const OrderCenter: React.FC = () => {
 
                         <Form.Item name="status" label="状态" className="!mb-0">
                             <Select placeholder="不限" allowClear>
-                                <Option value="PENDING">待支付</Option>
                                 <Option value="PAID">已支付</Option>
+                                <Option value="PARTIAL_REFUNDED">部分退款</Option>
                                 <Option value="EXCHANGING">申请调换</Option>
                                 <Option value="SHIPPED">已发货</Option>
                                 <Option value="REFUNDING">退款中</Option>

@@ -255,7 +255,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                 {order.items.map((item: any, iidx: number) => (
                                                     <div key={`status-${iidx}`} className="space-y-1">
                                                         {item.refunded_quantity > 0 && (
-                                                            <div className="text-[11px] text-green-600 font-bold bg-green-50 px-3 py-2 rounded-xl border border-green-100">
+                                                            <div className="text-[11px] text-purple-600 font-bold bg-purple-50 px-3 py-2 rounded-xl border border-purple-100">
                                                                 已退款{uniformTypeText[item.uniform_type] || item.product_name}{item.refunded_quantity}套，退款金额：{(Number(item.refunded_amount || 0) / 100).toFixed(2)}元
                                                             </div>
                                                         )}

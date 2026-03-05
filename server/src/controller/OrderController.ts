@@ -89,7 +89,24 @@ export class OrderController {
                 .leftJoin("order.items", "items")
                 .leftJoin("items.product", "product")
                 .leftJoin("student.class", "class")
-                .select("SUM(order.totalAmount)", "totalRevenue")
+                .select(`
+                    SUM(order.totalAmount) - 
+                    IFNULL((
+                        SELECT SUM(asr.new_quantity * oi2.price_snapshot)
+                        FROM after_sales_records asr
+                        INNER JOIN order_items oi2 ON asr.order_id = oi2.order_id AND asr.product_id = oi2.product_id
+                        WHERE asr.status = 'PROCESSED' AND asr.type = 'REFUND'
+                        AND asr.order_id IN (
+                            SELECT o2.id FROM orders o2
+                            INNER JOIN students s2 ON o2.student_id = s2.id
+                            INNER JOIN grades g2 ON s2.grade_id = g2.id
+                            WHERE 1=1
+                            ${schoolId && schoolId !== 'all' ? `AND g2.school_id = ${Number(schoolId)}` : ''}
+                            ${gradeId && gradeId !== 'all' ? `AND s2.grade_id = ${Number(gradeId)}` : ''}
+                            ${classId && classId !== 'all' ? `AND s2.class_id = ${Number(classId)}` : ''}
+                        )
+                    ), 0)
+                `, "totalRevenue")
                 .addSelect(`
                     SUM(CASE WHEN product.type = 0 THEN items.quantity ELSE 0 END) - 
                     IFNULL((
@@ -215,10 +232,12 @@ export class OrderController {
                 const autumnQty = items.filter(i => i.product.type === 1).reduce((sum, i) => sum + i.quantity, 0);
                 const winterQty = items.filter(i => i.product.type === 2).reduce((sum, i) => sum + i.quantity, 0);
 
+                const refundedTotal = items.reduce((sum, i) => sum + (i.refundedAmount || 0), 0);
+
                 return {
                     ...order,
                     items,
-                    totalAmount: order.totalAmount,
+                    totalAmount: order.totalAmount - refundedTotal,
                     summerQty,
                     autumnQty,
                     winterQty
