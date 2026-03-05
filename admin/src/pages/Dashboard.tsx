@@ -236,7 +236,7 @@ const Dashboard: React.FC = () => {
                 <Space>
                     <Popconfirm
                         title="导出确认"
-                        description={`确认导出 ${record.schoolName} 在当前筛选时间段内的已发货名单吗？`}
+                        description={`确认导出已发货名单吗？`}
                         onConfirm={() => handleExportShipped(record)}
                         okText="确定"
                         cancelText="取消"
@@ -246,7 +246,7 @@ const Dashboard: React.FC = () => {
                             icon={<ExportOutlined />}
                             type="link"
                         >
-                            导出已发货名单
+                            导出
                         </Button>
                     </Popconfirm>
                     <Button
@@ -265,7 +265,7 @@ const Dashboard: React.FC = () => {
     return (
         <div >
             {/* Filter Section */}
-            <Card className="mb-6 shadow-sm rounded-lg" bodyStyle={{ padding: '16px 24px' }}>
+            <Card className="mb-6 shadow-sm rounded-lg" styles={{ body: { padding: '16px 24px' } }}>
                 <Space size="large" align="center">
                     <Text strong style={{ fontSize: '15px' }}>查询时间</Text>
                     <RangePicker
@@ -347,11 +347,11 @@ const Dashboard: React.FC = () => {
             {/* History Detail Modal */}
             <Modal
                 title={`${selectedSchool?.name} - 业务历史详情`}
-                visible={historyModalVisible}
+                open={historyModalVisible}
                 onCancel={() => setHistoryModalVisible(false)}
                 footer={null}
                 width={850}
-                bodyStyle={{ padding: '24px' }}
+                styles={{ body: { padding: '24px' } }}
             >
                 {historyLoading ? (
                     <div className="py-20 text-center"><Text type="secondary">加载中...</Text></div>
@@ -359,7 +359,7 @@ const Dashboard: React.FC = () => {
                     <div>
                         <Row gutter={16}>
                             <Col span={6}>
-                                <Card size="small" title="总发货 (套)" headStyle={{ fontSize: '13px', background: '#f5f5f5' }}>
+                                <Card size="small" title="总发货 (套)" styles={{ header: { fontSize: '13px', background: '#f5f5f5' } }}>
                                     <div className="text-xs space-y-1">
                                         <p>夏装：<Text strong>{historySummary.shipped.summer}</Text></p>
                                         <p>秋装：<Text strong>{historySummary.shipped.autumn}</Text></p>
@@ -368,7 +368,7 @@ const Dashboard: React.FC = () => {
                                 </Card>
                             </Col>
                             <Col span={6}>
-                                <Card size="small" title="总退款 (套)" headStyle={{ fontSize: '13px', background: '#fff1f0' }}>
+                                <Card size="small" title="总退款 (套)" styles={{ header: { fontSize: '13px', background: '#fff1f0' } }}>
                                     <div className="text-xs space-y-1">
                                         <p>夏装：<Text type="danger" strong>{historySummary.refunded.summer}</Text></p>
                                         <p>秋装：<Text type="danger" strong>{historySummary.refunded.autumn}</Text></p>
@@ -377,7 +377,7 @@ const Dashboard: React.FC = () => {
                                 </Card>
                             </Col>
                             <Col span={6}>
-                                <Card size="small" title="申请调换 (套)" headStyle={{ fontSize: '13px', background: '#e6f7ff' }}>
+                                <Card size="small" title="申请调换 (套)" styles={{ header: { fontSize: '13px', background: '#e6f7ff' } }}>
                                     <div className="text-xs space-y-1">
                                         <p>夏装：<Text strong style={{ color: '#1677ff' }}>{historySummary.exchanged.summer}</Text></p>
                                         <p>秋装：<Text strong style={{ color: '#1677ff' }}>{historySummary.exchanged.autumn}</Text></p>
@@ -386,7 +386,7 @@ const Dashboard: React.FC = () => {
                                 </Card>
                             </Col>
                             <Col span={6}>
-                                <Card size="small" title="实际销售 (套)" headStyle={{ fontSize: '13px', background: '#f6ffed' }}>
+                                <Card size="small" title="实际销售 (套)" styles={{ header: { fontSize: '13px', background: '#f6ffed' } }}>
                                     <div className="text-xs space-y-1">
                                         <p>夏装：<Text strong style={{ color: '#52c41a' }}>{historySummary.sales.summer}</Text></p>
                                         <p>秋装：<Text strong style={{ color: '#52c41a' }}>{historySummary.sales.autumn}</Text></p>
