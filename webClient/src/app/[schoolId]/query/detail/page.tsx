@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeftOutlined, SwapOutlined, UndoOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SwapOutlined, UndoOutlined, PlusOutlined, MinusOutlined } from '@ant-design/icons';
 import { Typography, Tag, Card, Button, Empty, message, Modal, Input, InputNumber } from 'antd';
 import { Picker, Divider } from 'antd-mobile';
 import Footer from '@/components/Footer';
@@ -427,17 +427,32 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                     </div>
 
                     <div>
-                        <Text type="secondary" style={{ fontSize: '11px' }} className="block mb-2 px-1 font-bold uppercase">换货套数 (最大 {exchangeModal?.maxQty || 1} 套)</Text>
-                        <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                            <InputNumber
-                                min={1}
-                                max={exchangeModal?.maxQty || 1}
-                                value={exchangeModal?.qty}
-                                onChange={(v) => setExchangeModal(prev => prev ? { ...prev, qty: v || 1 } : null)}
-                                size="large"
-                                className="w-full rounded-xl border-none bg-transparent"
-                            />
-                            <Text className="text-gray-400 font-bold pr-2">套</Text>
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <Text type="secondary" style={{ fontSize: '11px' }} className="font-bold uppercase">换货套数 (最大 {exchangeModal?.maxQty || 1} 套)</Text>
+                        </div>
+                        <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <Text className="text-gray-500 font-bold">申请数量</Text>
+                            {(exchangeModal?.maxQty || 1) > 1 ? (
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${exchangeModal?.qty && exchangeModal.qty > 1 ? 'border-blue-200 text-blue-600 bg-white active:bg-blue-50' : 'border-gray-200 text-gray-300 bg-gray-50 cursor-not-allowed'}`}
+                                        disabled={!exchangeModal?.qty || exchangeModal.qty <= 1}
+                                        onClick={() => setExchangeModal(prev => prev ? { ...prev, qty: Math.max(1, (prev.qty || 1) - 1) } : null)}
+                                    >
+                                        <MinusOutlined className="text-xs" />
+                                    </button>
+                                    <Text className="text-lg font-black text-gray-800 w-4 text-center">{exchangeModal?.qty || 1}</Text>
+                                    <button
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${exchangeModal?.qty && exchangeModal.qty < (exchangeModal.maxQty || 1) ? 'border-blue-200 text-blue-600 bg-white active:bg-blue-50' : 'border-gray-200 text-gray-300 bg-gray-50 cursor-not-allowed'}`}
+                                        disabled={!exchangeModal?.qty || exchangeModal.qty >= (exchangeModal.maxQty || 1)}
+                                        onClick={() => setExchangeModal(prev => prev ? { ...prev, qty: Math.min(prev.maxQty || 1, (prev.qty || 1) + 1) } : null)}
+                                    >
+                                        <PlusOutlined className="text-xs" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <Text className="text-lg font-black text-gray-800">1 套</Text>
+                            )}
                         </div>
                     </div>
                 </div>

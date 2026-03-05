@@ -1,6 +1,6 @@
 import { Request, Response } from "express"
 import { AppDataSource } from "../data-source"
-import { In } from "typeorm"
+import { In, Between, LessThanOrEqual, MoreThanOrEqual } from "typeorm"
 import { Order, OrderStatus } from "../entity/Order"
 import { School } from "../entity/School"
 import { Student } from "../entity/Student"
@@ -180,8 +180,11 @@ export class ShippingController {
 
                 if (orderIds.length === 0) return 0
 
-                // 1. Update orders to SHIPPED
-                await manager.getRepository(Order).update(orderIds, { status: OrderStatus.SHIPPED })
+                // 1. Update orders to SHIPPED and set shippedAt
+                await manager.getRepository(Order).update(orderIds, {
+                    status: OrderStatus.SHIPPED,
+                    shippedAt: new Date()
+                })
 
                 // 2. Mark pending Exchange records as PROCESSED
                 await manager.getRepository(AfterSalesRecord).update(
@@ -199,6 +202,97 @@ export class ShippingController {
             })
         } catch (error) {
             console.error('ShippingController.confirmShip error:', error)
+            return res.status(500).json({ code: 500, message: 'Internal server error' })
+        }
+    }
+
+    /**
+     * 导出已发货订单（按学生维度汇总，Dashboard使用）
+     * GET /shipping/:schoolId/export-shipped?startDate=...&endDate=...
+     */
+    static async exportShippedList(req: Request, res: Response) {
+        try {
+            const schoolId = parseInt(req.params.schoolId)
+            const { startDate, endDate } = req.query as { startDate?: string, endDate?: string }
+
+            const query = AppDataSource.getRepository(Order)
+                .createQueryBuilder('order')
+                .innerJoinAndSelect('order.student', 'student')
+                .leftJoinAndSelect('student.grade', 'grade')
+                .leftJoinAndSelect('student.class', 'class')
+                .innerJoinAndSelect('order.items', 'item')
+                .innerJoinAndSelect('item.product', 'product')
+                .leftJoinAndSelect('order.afterSales', 'asr', 'asr.status = :asrStatus', { asrStatus: AfterSalesStatus.PROCESSED })
+                .innerJoin('student.grade', 'g')
+                .innerJoin('g.school', 'school')
+                .where('school.id = :schoolId', { schoolId })
+                .andWhere('order.status = :status', { status: OrderStatus.SHIPPED })
+
+            if (startDate) {
+                query.andWhere('order.shippedAt >= :start', { start: `${startDate} 00:00:00` })
+            }
+            if (endDate) {
+                query.andWhere('order.shippedAt <= :end', { end: `${endDate} 23:59:59` })
+            }
+
+            const orders = await query
+                .orderBy('grade.name', 'ASC')
+                .addOrderBy('class.name', 'ASC')
+                .addOrderBy('student.name', 'ASC')
+                .getMany()
+
+            // Group by student for "一人一行"
+            const studentMap = new Map<number, any>()
+
+            orders.forEach(order => {
+                const sid = order.studentId
+                if (!studentMap.has(sid)) {
+                    studentMap.set(sid, {
+                        studentName: order.student?.name || '',
+                        gradeName: order.student?.grade?.name || '',
+                        className: order.student?.class?.name || '',
+                        birthday: order.student?.birthday || '',
+                        summerQty: 0,
+                        summerSize: '—',
+                        autumnQty: 0,
+                        autumnSize: '—',
+                        winterQty: 0,
+                        winterSize: '—',
+                        shippedAt: order.shippedAt ? new Date(order.shippedAt).toLocaleString('zh-CN') : '—'
+                    })
+                }
+
+                const sData = studentMap.get(sid)
+
+                order.items.forEach(item => {
+                    const type = item.product?.type // 0: 夏, 1: 春秋, 2: 冬
+
+                    // Find processed exchange/refund for this item to get final size/qty
+                    const processedASR = (order.afterSales || []).filter(asr => asr.productId === item.product?.id)
+                    const refunds = processedASR.filter(asr => asr.type === AfterSalesType.REFUND)
+                    const exchanges = processedASR.filter(asr => asr.type === AfterSalesType.EXCHANGE)
+
+                    const refundedQty = refunds.reduce((sum, r) => sum + Number(r.newQuantity), 0)
+                    const finalQty = Math.max(0, item.quantity - refundedQty)
+                    const finalSize = exchanges.length > 0 ? exchanges[exchanges.length - 1].newSize : (item.size || '—')
+
+                    if (type === 0) {
+                        sData.summerQty += finalQty
+                        if (finalQty > 0) sData.summerSize = finalSize
+                    } else if (type === 1) {
+                        sData.autumnQty += finalQty
+                        if (finalQty > 0) sData.autumnSize = finalSize
+                    } else if (type === 2) {
+                        sData.winterQty += finalQty
+                        if (finalQty > 0) sData.winterSize = finalSize
+                    }
+                })
+            })
+
+            const rows = Array.from(studentMap.values())
+            return res.json({ code: 200, data: rows })
+        } catch (error) {
+            console.error('ShippingController.exportShippedList error:', error)
             return res.status(500).json({ code: 500, message: 'Internal server error' })
         }
     }

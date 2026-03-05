@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Col, Row, Statistic, Table, Typography, DatePicker, Button, Space, message } from 'antd';
+import { Card, Col, Row, Statistic, Table, Typography, DatePicker, Button, Space, message, Popconfirm } from 'antd';
+import { ExportOutlined } from '@ant-design/icons';
+import request from '../utils/request';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 
@@ -17,6 +19,43 @@ interface SchoolSaleRecord {
     winterQty: number;
     refundedQty: number;
     totalAmount: number;
+}
+
+// Convert JSON array to CSV and trigger download for SHIPPED list (一人一行)
+function downloadShippedCSV(rows: any[], filename: string) {
+    if (!rows.length) { message.warning('该时间段内暂无已发货订单'); return; }
+
+    // Mapping: Backend key -> CSV Column Header
+    const headerLabels: Record<string, string> = {
+        studentName: '学生姓名',
+        gradeName: '年级',
+        className: '班级',
+        birthday: '生日',
+        summerQty: '夏装(套)',
+        summerSize: '夏尺码',
+        autumnQty: '秋装(套)',
+        autumnSize: '秋尺码',
+        winterQty: '冬装(套)',
+        winterSize: '冬尺码',
+        shippedAt: '发货时间'
+    };
+
+    const headers = Object.keys(headerLabels);
+    const csvHeader = headers.map(h => headerLabels[h]).join(',');
+
+    const csvRows = rows.map(r =>
+        headers.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(',')
+    );
+
+    const bom = '\uFEFF';
+    const csv = bom + [csvHeader, ...csvRows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 const Dashboard: React.FC = () => {
@@ -75,11 +114,28 @@ const Dashboard: React.FC = () => {
         fetchData(dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD'));
     };
 
+    const handleExportShipped = async (record: SchoolSaleRecord) => {
+        const startDate = dates?.[0]?.format('YYYY-MM-DD');
+        const endDate = dates?.[1]?.format('YYYY-MM-DD');
+
+        try {
+            const res = await request.get(`/shipping/${record.key}/export-shipped`, {
+                params: { startDate, endDate }
+            });
+            if (res.data.code === 200) {
+                downloadShippedCSV(res.data.data, `已发货名单_${record.schoolName}_${startDate || '始'}_${endDate || '终'}.csv`);
+                message.success('已发货名单导出成功');
+            }
+        } catch (error) {
+            message.error('导出失败，请重试');
+        }
+    };
+
     // Calculate totals for cards
-    const totalSummer = data.reduce((sum, item) => sum + item.summerQty, 0);
-    const totalAutumn = data.reduce((sum, item) => sum + item.autumnQty, 0);
-    const totalWinter = data.reduce((sum, item) => sum + item.winterQty, 0);
-    const totalSales = data.reduce((sum, item) => sum + item.totalAmount, 0);
+    const totalSummer = data.reduce((sum: number, item: SchoolSaleRecord) => sum + item.summerQty, 0);
+    const totalAutumn = data.reduce((sum: number, item: SchoolSaleRecord) => sum + item.autumnQty, 0);
+    const totalWinter = data.reduce((sum: number, item: SchoolSaleRecord) => sum + item.winterQty, 0);
+    const totalSales = data.reduce((sum: number, item: SchoolSaleRecord) => sum + item.totalAmount, 0);
 
     const columns: ColumnsType<SchoolSaleRecord> = [
         { title: '学校名称', dataIndex: 'schoolName', key: 'schoolName', width: '20%' },
@@ -118,6 +174,27 @@ const Dashboard: React.FC = () => {
             align: 'right',
             render: (val: number) => <strong style={{ fontSize: '15px' }}>¥ {val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
         },
+        {
+            title: '操作',
+            key: 'action',
+            render: (_, record) => (
+                <Popconfirm
+                    title="导出确认"
+                    description={`确认导出 ${record.schoolName} 在当前筛选时间段内的已发货名单吗？`}
+                    onConfirm={() => handleExportShipped(record)}
+                    okText="确定"
+                    cancelText="取消"
+                >
+                    <Button
+                        size="small"
+                        icon={<ExportOutlined />}
+                        type="link"
+                    >
+                        导出已发货名单
+                    </Button>
+                </Popconfirm>
+            )
+        }
     ];
 
     return (

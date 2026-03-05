@@ -47,6 +47,9 @@ export class Order {
     @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
     paidAt!: Date | null
 
+    @Column({ name: 'shipped_at', type: 'timestamp', nullable: true })
+    shippedAt!: Date | null
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date
 

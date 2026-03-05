@@ -39,6 +39,7 @@ router.put("/after-sales/:id/reject", auth, AfterSalesController.reject)
 // Shipping Management (protected)
 router.get("/shipping/stats", auth, ShippingController.getStats)
 router.get("/shipping/:schoolId/export", auth, ShippingController.exportManifest)
+router.get("/shipping/:schoolId/export-shipped", auth, ShippingController.exportShippedList)
 router.post("/shipping/:schoolId/confirm", auth, ShippingController.confirmShip)
 
 // V2 Roster Matching (protected)

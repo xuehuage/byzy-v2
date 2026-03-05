@@ -108,10 +108,10 @@ const OrderCenter: React.FC = () => {
             title: '商品项',
             key: 'items',
             render: (_, r) => (
-                <Space direction="vertical" size={0}>
+                <Space direction="vertical" size={2}>
                     {r.items?.map((item, idx) => (
-                        <Text key={idx} type="secondary">
-                            {item.product?.name}: {item.size || '未填'} ({item.quantity}套{item.refundedQuantity > 0 ? `，已退${item.refundedQuantity}套` : ''})
+                        <Text key={idx} type="secondary" className="block text-xs">
+                            {item.product?.name}: {item.quantity}套{item.refundedQuantity > 0 ? ` (已退${item.refundedQuantity}套)` : ''}
                         </Text>
                     ))}
                 </Space>
