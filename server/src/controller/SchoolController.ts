@@ -28,7 +28,7 @@ export class SchoolController {
                 .addSelect("st.grade_id", "gradeId")
                 .addSelect("COUNT(DISTINCT st.id)", "count")
                 .innerJoin("orders", "o", "o.student_id = st.id")
-                .where("o.status NOT IN (:...exclude)", { exclude: [OrderStatus.CANCELLED] })
+                .where("o.status NOT IN (:...exclude)", { exclude: [OrderStatus.CANCELLED, OrderStatus.REFUNDED] })
                 .groupBy("st.grade_id")
                 .addGroupBy("st.class_id")
                 .getRawMany()
