@@ -121,7 +121,10 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
                 name,
                 phone,
                 birthday,
-                items: validItems
+                items: validItems.map(item => ({
+                    ...item,
+                    size: item.isSpecialSize ? '' : item.size
+                }))
             };
             const res = await createOrderV2(payload);
             if (res.code === 200) {

@@ -133,7 +133,9 @@ export class ShippingController {
                         ? pendingExchange.newQuantity
                         : Math.max(0, item.quantity - refundedQty);
 
-                    const actualSize = pendingExchange?.newSize || item.size || '—';
+                    const actualSize = pendingExchange
+                        ? pendingExchange.newSize
+                        : (item.isSpecialSize ? '特殊尺码' : (item.size || '—'));
 
                     return {
                         orderNo: order.orderNo,
@@ -209,7 +211,7 @@ export class ShippingController {
                             className: order.student?.class?.name || '',
                             productType: item.product?.type, // store raw type for grouping later
                             productTypeName: productTypeNames[item.product?.type] || '校服',
-                            size: pendingExchange?.newSize || item.size || '—',
+                            size: pendingExchange?.newSize || (item.isSpecialSize ? '特殊尺码' : (item.size || '—')),
                             quantity: actualQty,
                             isSpecialSize: item.isSpecialSize ? '是' : '否',
                             height: item.height || '',

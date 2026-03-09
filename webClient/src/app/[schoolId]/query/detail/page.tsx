@@ -252,7 +252,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                     </div>
                                                     <div className="flex gap-4 mt-2">
                                                         <div className="px-2 py-0.5 bg-gray-100 rounded text-[11px] text-gray-500 font-medium">
-                                                            尺码：{item.size || '以实际发放为准'}
+                                                            尺码：{item.is_special_size ? `特殊尺码 (身高${item.height}cm / 体重${item.weight}斤)` : (item.size || '以实际发放为准')}
                                                         </div>
                                                         <div className="px-2 py-0.5 bg-gray-100 rounded text-[11px] text-gray-500 font-medium">
                                                             数量：{item.quantity} 套
