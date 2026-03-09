@@ -151,7 +151,7 @@ export default function OrderPage({ params }: { params: Promise<{ schoolId: stri
                 bodyStyle={{ padding: 0 }}
             >
                 {/* Image Container */}
-                <div className="relative w-full aspect-[4/3] bg-gray-50 flex items-center justify-center overflow-hidden">
+                <div className="relative p-8 w-full aspect-[4/3] bg-gray-50 flex items-center justify-center overflow-hidden">
                     {image ? (
                         <Image
                             src={`${apiBase}${image}`}

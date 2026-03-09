@@ -101,15 +101,28 @@ export class SchoolController {
                 return qb
             }
 
-            // 1. Total unique purchaser count
+            // 1. Total unique purchaser count — exclude students who have fully refunded all items
+            // Logic: for each student, sum their purchased qty, subtract processed refund qty.
+            // Only count them if net_qty > 0.
             query.addSelect(qb => {
-                const subQuery = qb.select("COUNT(DISTINCT o.student_id)", "studentCount")
-                    .from("orders", "o")
-                    .innerJoin("order_items", "oi", "oi.order_id = o.id")
-                    .innerJoin("products", "p", "oi.product_id = p.id")
-                    .where("p.school_id = school.id")
-                    .andWhere("o.status NOT IN (:...exclude)", { exclude: [OrderStatus.CANCELLED] })
-                return applyDateFilter(subQuery, "o")
+                const subQuery = qb.select("COUNT(DISTINCT net_buyers.student_id)", "studentCount")
+                    .from(qb2 => {
+                        return qb2
+                            .select("o.student_id", "student_id")
+                            .addSelect("SUM(oi.quantity)", "total_bought")
+                            .addSelect("IFNULL(SUM(asr.new_quantity), 0)", "total_refunded")
+                            .from("orders", "o")
+                            .innerJoin("order_items", "oi", "oi.order_id = o.id")
+                            .innerJoin("products", "p", "oi.product_id = p.id")
+                            .leftJoin("after_sales_records", "asr",
+                                "asr.order_id = o.id AND asr.type = 'REFUND' AND asr.status = 'PROCESSED'"
+                            )
+                            .where("p.school_id = school.id")
+                            .andWhere("o.status NOT IN (:...scExclude)", { scExclude: [OrderStatus.CANCELLED] })
+                            .groupBy("o.student_id")
+                            .having("SUM(oi.quantity) - IFNULL(SUM(asr.new_quantity), 0) > 0")
+                    }, "net_buyers")
+                return applyDateFilter(subQuery, "net_buyers")
             }, "studentCount")
 
             // 2-4. Uniform quantities

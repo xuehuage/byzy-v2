@@ -89,10 +89,6 @@ fwIDAQAB
             const body = JSON.stringify(data);
             const sign = this.generateSign(body, key);
 
-            console.log(`[Payment Debug] URL: ${this.BASE_URL}${path}`);
-            console.log(`[Payment Debug] Final Body: ${body}`);
-            console.log(`[Payment Debug] SN: ${sn}, Sign: ${sign}`);
-
             const response = await axios.post(`${this.BASE_URL}${path}`, body, {
                 headers: {
                     'Authorization': `${sn} ${sign}`,

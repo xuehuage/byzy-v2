@@ -179,19 +179,20 @@ const SchoolList: React.FC = () => {
     const columns: ColumnsType<SchoolStats> = [
 
         {
+            title: 'ID',
+            dataIndex: 'id',
+            key: 'id',
+            fixed: 'left',
+            width: 60,
+            align: 'center',
+        },
+        {
             title: '学校名称',
             dataIndex: 'name',
             key: 'name',
             fixed: 'left',
             width: 150,
             render: (text) => <span className="font-bold">{text}</span>,
-        },
-        {
-            title: 'ID',
-            dataIndex: 'id',
-            key: 'id',
-            width: 60,
-            align: 'right',
         },
         {
             title: '总人数',
