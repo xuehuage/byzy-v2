@@ -90,7 +90,20 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                 original_quantity: primaryItem?.quantity ?? 1,
                 new_quantity: exchangeModal?.qty || primaryItem?.quantity || 1,
             });
-            message.success('调换申请已提交，请等待管理员处理');
+
+            Modal.success({
+                title: '提交成功',
+                content: '调换申请已提交，请等待管理员处理。',
+                okText: '好的',
+                maskClosable: false,
+                footer: (
+                    <div className="flex gap-3 justify-end mt-4">
+                        <Button onClick={() => Modal.destroyAll()}>好的</Button>
+                        <Button type="primary" onClick={() => { Modal.destroyAll(); router.push('/') }}>回到首页</Button>
+                    </div>
+                )
+            });
+
             setExchangeModal(null);
             if (exchangeModal?.orderId) updateOrderStatus(exchangeModal.orderId, 'EXCHANGING');
         } catch (err: any) {
@@ -112,7 +125,20 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                 original_quantity: primaryItem?.quantity ?? 1,
                 new_quantity: refundQty,
             });
-            message.success('退款申请已提交，请等待管理员处理');
+
+            Modal.success({
+                title: '提交成功',
+                content: '退款申请已提交，请等待管理员处理。',
+                okText: '好的',
+                maskClosable: false,
+                footer: (
+                    <div className="flex gap-3 justify-end mt-4">
+                        <Button onClick={() => Modal.destroyAll()}>好的</Button>
+                        <Button type="primary" onClick={() => { Modal.destroyAll(); router.push('/') }}>回到首页</Button>
+                    </div>
+                )
+            });
+
             setRefundModal(null);
             if (refundModal?.orderId) updateOrderStatus(refundModal.orderId, 'REFUNDING');
         } catch (err: any) {
@@ -312,7 +338,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                                     setExchangeModal({
                                                                         open: true,
                                                                         orderId: order.order_id || order.id,
-                                                                        currentSize: availableItem?.size,
+                                                                        currentSize: availableItem?.is_special_size ? '特殊尺码' : availableItem?.size,
                                                                         maxQty: remainingExhangeQty,
                                                                         qty: remainingExhangeQty || 1,
                                                                         newSize: '160#',

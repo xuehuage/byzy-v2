@@ -284,23 +284,31 @@ export class AfterSalesController {
                 })
 
                 if (otherPending === 0) {
-                    // Revert order status
+                    // Robust rollback status machine
                     const currentOrder = record.order
-                    if (currentOrder.status === OrderStatus.EXCHANGING || currentOrder.status === OrderStatus.REFUNDING) {
-                        if (currentOrder.shippedAt) {
-                            currentOrder.status = OrderStatus.SHIPPED
-                        } else {
-                            const processedRefundsCount = await manager.count(AfterSalesRecord, {
-                                where: {
-                                    orderId: record.orderId,
-                                    status: AfterSalesStatus.PROCESSED,
-                                    type: AfterSalesType.REFUND
-                                }
-                            })
-                            currentOrder.status = processedRefundsCount > 0 ? OrderStatus.PARTIAL_REFUNDED : OrderStatus.PAID
+
+                    // Priority 1: Check if there are any processed refunds
+                    const processedRefundsCount = await manager.count(AfterSalesRecord, {
+                        where: {
+                            orderId: record.orderId,
+                            status: AfterSalesStatus.PROCESSED,
+                            type: AfterSalesType.REFUND
                         }
-                        await manager.save(currentOrder)
+                    })
+
+                    if (processedRefundsCount > 0) {
+                        currentOrder.status = OrderStatus.PARTIAL_REFUNDED
                     }
+                    // Priority 2: Check if order has been shipped
+                    else if (currentOrder.shippedAt) {
+                        currentOrder.status = OrderStatus.SHIPPED
+                    }
+                    // Priority 3: Default back to PAID
+                    else {
+                        currentOrder.status = OrderStatus.PAID
+                    }
+
+                    await manager.save(currentOrder)
                 }
             })
 
@@ -311,7 +319,7 @@ export class AfterSalesController {
             if (msg.includes("Unknown column") || msg.includes("Data truncated") || msg.includes("mismatch")) {
                 return res.status(500).json({
                     code: 500,
-                    message: `数据库操作失败：可能是字段缺失或状态枚举不匹配。请检查数据库 V2 升级脚本是否执行完全。详细错误: ${msg}`
+                    message: `数据库操作失败：可能是字段缺失或状态枚举不匹配。请执行 v2_db_status_enum_fix.sql 中的更新脚本。详细错误: ${msg}`
                 })
             }
             res.status(500).json({ code: 500, message: msg || "Internal server error" })
