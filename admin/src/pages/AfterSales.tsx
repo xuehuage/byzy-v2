@@ -273,6 +273,7 @@ const AfterSales: React.FC = () => {
                             </Tag>
                         </Descriptions.Item>
                         <Descriptions.Item label="学生姓名">{selectedRecord.order?.student?.name || '—'}</Descriptions.Item>
+                        <Descriptions.Item label="联系电话">{selectedRecord.order?.student?.phone || '—'}</Descriptions.Item>
                         <Descriptions.Item label="订单号">{selectedRecord.order?.orderNo || `#${selectedRecord.orderId}`}</Descriptions.Item>
 
                         <Descriptions.Item label="当前/原尺码">
