@@ -140,14 +140,31 @@ const AfterSales: React.FC = () => {
             title: '商品/尺码',
             key: 'items',
             render: (_, r) => {
+                const formatSize = (size: string, isSpecial: boolean, h: number | null, w: number | null) => {
+                    if (isSpecial || size.includes('特殊')) {
+                        return <Tag color="purple">特殊:{h}cm/{w}斤</Tag>;
+                    }
+                    return <Text strong>{size || '—'}</Text>;
+                };
+
                 if (r.type === 'EXCHANGE') {
                     const newSizeDisplay = r.isSpecialSize
                         ? <Tag color="purple">特殊:{r.height}cm/{r.weight}斤</Tag>
                         : <Text strong style={{ color: '#1677ff' }}>{r.newSize || '160#'}</Text>;
-                    return <Text type="secondary">{r.originalSize} → {newSizeDisplay}</Text>;
+                    return <div className="flex flex-col gap-1">
+                        <Text type="secondary" style={{ fontSize: 11 }}>原: {formatSize(r.originalSize, r.isSpecialSize, r.height, r.weight)}</Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>换: {newSizeDisplay}</Text>
+                    </div>;
                 }
                 const name = getProductName(r.product);
-                return <Text type="secondary">{name} {r.newQuantity} 套</Text>;
+                return (
+                    <div className="flex flex-col gap-1">
+                        <Text strong>{name}</Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                            尺码: {formatSize(r.originalSize, !!r.isSpecialSize, r.height, r.weight)}
+                        </Text>
+                    </div>
+                );
             }
         },
         {
@@ -247,10 +264,17 @@ const AfterSales: React.FC = () => {
                         <Descriptions.Item label="学生姓名">{selectedRecord.order?.student?.name || '—'}</Descriptions.Item>
                         <Descriptions.Item label="订单号">{selectedRecord.order?.orderNo || `#${selectedRecord.orderId}`}</Descriptions.Item>
 
+                        <Descriptions.Item label="当前/原尺码">
+                            {selectedRecord.isSpecialSize ? (
+                                <Tag color="purple">特殊尺码 ({selectedRecord.height}cm / {selectedRecord.weight}斤)</Tag>
+                            ) : (
+                                selectedRecord.originalSize || '—'
+                            )}
+                        </Descriptions.Item>
+
                         {selectedRecord.type === 'EXCHANGE' ? (
                             <>
-                                <Descriptions.Item label="当前尺码">{selectedRecord.originalSize}</Descriptions.Item>
-                                <Descriptions.Item label="目标尺码" contentStyle={{ color: '#1677ff', fontWeight: 'bold' }}>
+                                <Descriptions.Item label="目标换货尺码" contentStyle={{ color: '#1677ff', fontWeight: 'bold' }}>
                                     {selectedRecord.isSpecialSize ? (
                                         <Badge status="warning" text={`特殊尺码 (${selectedRecord.height}cm / ${selectedRecord.weight}斤)`} />
                                     ) : (
@@ -276,12 +300,11 @@ const AfterSales: React.FC = () => {
                                 )}
                             </>
                         )}
-
                         <Descriptions.Item label="申请时间">{new Date(selectedRecord.createdAt).toLocaleString()}</Descriptions.Item>
                     </Descriptions>
                 )}
             </Modal>
-        </div>
+        </div >
     );
 };
 

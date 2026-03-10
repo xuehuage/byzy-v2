@@ -45,6 +45,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
     // Refund modal state
     const [refundModal, setRefundModal] = useState<{ open: boolean; orderId: number; maxQty: number; orderName: string } | null>(null);
     const [refundQty, setRefundQty] = useState(1);
+    const [showSuccessMask, setShowSuccessMask] = useState<{ open: boolean; type: 'EXCHANGE' | 'REFUND' }>({ open: false, type: 'EXCHANGE' });
 
     useEffect(() => {
         const data = sessionStorage.getItem('selectedStudent');
@@ -91,21 +92,9 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                 new_quantity: exchangeModal?.qty || primaryItem?.quantity || 1,
             });
 
-            Modal.success({
-                title: '提交成功',
-                content: '调换申请已提交，请等待管理员处理。',
-                okText: '好的',
-                maskClosable: false,
-                footer: (
-                    <div className="flex gap-3 justify-end mt-4">
-                        <Button onClick={() => Modal.destroyAll()}>好的</Button>
-                        <Button type="primary" onClick={() => { Modal.destroyAll(); router.push('/') }}>回到首页</Button>
-                    </div>
-                )
-            });
-
             setExchangeModal(null);
             if (exchangeModal?.orderId) updateOrderStatus(exchangeModal.orderId, 'EXCHANGING');
+            setShowSuccessMask({ open: true, type: 'EXCHANGE' });
         } catch (err: any) {
             message.error(err.message || '提交失败');
         } finally {
@@ -126,21 +115,9 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                 new_quantity: refundQty,
             });
 
-            Modal.success({
-                title: '提交成功',
-                content: '退款申请已提交，请等待管理员处理。',
-                okText: '好的',
-                maskClosable: false,
-                footer: (
-                    <div className="flex gap-3 justify-end mt-4">
-                        <Button onClick={() => Modal.destroyAll()}>好的</Button>
-                        <Button type="primary" onClick={() => { Modal.destroyAll(); router.push('/') }}>回到首页</Button>
-                    </div>
-                )
-            });
-
             setRefundModal(null);
             if (refundModal?.orderId) updateOrderStatus(refundModal.orderId, 'REFUNDING');
+            setShowSuccessMask({ open: true, type: 'REFUND' });
         } catch (err: any) {
             message.error(err.message || '提交失败');
         } finally {
@@ -338,7 +315,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                                                                     setExchangeModal({
                                                                         open: true,
                                                                         orderId: order.order_id || order.id,
-                                                                        currentSize: availableItem?.is_special_size ? '特殊尺码' : availableItem?.size,
+                                                                        currentSize: availableItem?.is_special_size ? '特殊尺码' : (availableItem?.size || '未知尺码'),
                                                                         maxQty: remainingExhangeQty,
                                                                         qty: remainingExhangeQty || 1,
                                                                         newSize: '160#',
@@ -567,6 +544,29 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                     </div>
                 </div>
             </Modal>
+
+            {/* Success Mask */}
+            {showSuccessMask.open && (
+                <div className="fixed inset-0 z-[9999] bg-white flex flex-col items-center justify-center p-8 animate-fadeIn">
+                    <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mb-6">
+                        <CheckCircleOutlined className="text-green-500 text-5xl" />
+                    </div>
+                    <Title level={3} className="mb-2 font-black">提交成功</Title>
+                    <Text type="secondary" className="text-center text-base mb-12 px-4">
+                        您的{showSuccessMask.type === 'EXCHANGE' ? '调换' : '退款'}申请已成功提交，<br />
+                        请耐心等待管理员审核与处理。
+                    </Text>
+                    <Button
+                        type="primary"
+                        size="large"
+                        block
+                        className="h-14 rounded-2xl font-bold text-lg shadow-xl shadow-blue-100"
+                        onClick={() => router.push('/')}
+                    >
+                        回到主页
+                    </Button>
+                </div>
+            )}
 
             <Footer />
         </div>

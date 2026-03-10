@@ -201,7 +201,15 @@ export class AfterSalesController {
                 ? order.items?.find(i => i.product.id === Number(product_id))
                 : order.items?.[0]
 
-            const finalOriginalSize = original_size || targetItem?.size || "未填"
+            let finalOriginalSize = original_size
+            if (!finalOriginalSize) {
+                if (targetItem?.isSpecialSize) {
+                    finalOriginalSize = `特殊尺码 (${targetItem.height}cm / ${targetItem.weight}斤)`
+                } else {
+                    finalOriginalSize = targetItem?.size || "未填"
+                }
+            }
+
             const finalOriginalQty = Number(original_quantity || targetItem?.quantity || 1)
 
             const record = AppDataSource.getRepository(AfterSalesRecord).create({
@@ -213,8 +221,8 @@ export class AfterSalesController {
                 originalQuantity: finalOriginalQty,
                 newQuantity: Number(new_quantity || finalOriginalQty),
                 isSpecialSize: !!is_special_size,
-                height: height ? Number(height) : null,
-                weight: weight ? Number(weight) : null,
+                height: height ? Number(height) : (is_special_size ? targetItem?.height : null),
+                weight: weight ? Number(weight) : (is_special_size ? targetItem?.weight : null),
             })
 
             await AppDataSource.getRepository(AfterSalesRecord).save(record)
