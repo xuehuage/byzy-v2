@@ -254,6 +254,8 @@ export class AfterSalesController {
     static async cancel(req: Request, res: Response) {
         try {
             const id = parseInt(req.params.id)
+            if (isNaN(id)) return res.status(400).json({ code: 400, message: "参数错误" })
+
             const recordRepository = AppDataSource.getRepository(AfterSalesRecord)
             const record = await recordRepository.findOne({
                 where: { id },
@@ -263,35 +265,56 @@ export class AfterSalesController {
             if (!record) return res.status(404).json({ code: 404, message: "记录不存在" })
             if (record.status !== AfterSalesStatus.PENDING) return res.status(400).json({ code: 400, message: "只有待审核的状态可以取消" })
 
-            record.status = AfterSalesStatus.CANCELLED
-            await recordRepository.save(record)
-
-            // Revert order status if no other pending after-sales
-            const otherPending = await recordRepository.countBy({
-                orderId: record.orderId,
-                status: AfterSalesStatus.PENDING
-            })
-
-            if (otherPending === 0) {
-                if (record.order.status === OrderStatus.EXCHANGING || record.order.status === OrderStatus.REFUNDING) {
-                    if (record.order.shippedAt) {
-                        record.order.status = OrderStatus.SHIPPED
-                    } else {
-                        const processedRefundsCount = await recordRepository.countBy({
-                            orderId: record.orderId,
-                            status: AfterSalesStatus.PROCESSED,
-                            type: AfterSalesType.REFUND
-                        })
-                        record.order.status = processedRefundsCount > 0 ? OrderStatus.PARTIAL_REFUNDED : OrderStatus.PAID
-                    }
-                    await AppDataSource.getRepository(Order).save(record.order)
-                }
+            if (!record.order) {
+                return res.status(400).json({ code: 400, message: "关联订单数据异常" })
             }
 
+            // Use transaction for consistency
+            await AppDataSource.manager.transaction(async (manager) => {
+                // 1. Mark record as cancelled
+                record.status = AfterSalesStatus.CANCELLED
+                await manager.save(record)
+
+                // 2. Check for other pending after-sales for this order
+                const otherPending = await manager.count(AfterSalesRecord, {
+                    where: {
+                        orderId: record.orderId,
+                        status: AfterSalesStatus.PENDING
+                    }
+                })
+
+                if (otherPending === 0) {
+                    // Revert order status
+                    const currentOrder = record.order
+                    if (currentOrder.status === OrderStatus.EXCHANGING || currentOrder.status === OrderStatus.REFUNDING) {
+                        if (currentOrder.shippedAt) {
+                            currentOrder.status = OrderStatus.SHIPPED
+                        } else {
+                            const processedRefundsCount = await manager.count(AfterSalesRecord, {
+                                where: {
+                                    orderId: record.orderId,
+                                    status: AfterSalesStatus.PROCESSED,
+                                    type: AfterSalesType.REFUND
+                                }
+                            })
+                            currentOrder.status = processedRefundsCount > 0 ? OrderStatus.PARTIAL_REFUNDED : OrderStatus.PAID
+                        }
+                        await manager.save(currentOrder)
+                    }
+                }
+            })
+
             res.json({ code: 200, message: "取消成功" })
-        } catch (error) {
+        } catch (error: any) {
             console.error("Cancel after-sales error:", error)
-            res.status(500).json({ code: 500, message: "Internal server error" })
+            const msg = error.message || ""
+            if (msg.includes("Unknown column") || msg.includes("Data truncated") || msg.includes("mismatch")) {
+                return res.status(500).json({
+                    code: 500,
+                    message: `数据库操作失败：可能是字段缺失或状态枚举不匹配。请检查数据库 V2 升级脚本是否执行完全。详细错误: ${msg}`
+                })
+            }
+            res.status(500).json({ code: 500, message: msg || "Internal server error" })
         }
     }
 }
