@@ -35,7 +35,7 @@ export interface AfterSalesRecord {
     id: number
     orderId: number
     type: 'EXCHANGE' | 'REFUND'
-    status: 'PENDING' | 'PROCESSED' | 'REJECTED'
+    status: 'PENDING' | 'PROCESSED' | 'REJECTED' | 'CANCELLED'
     originalQuantity: number
     originalSize: string
     newQuantity: number

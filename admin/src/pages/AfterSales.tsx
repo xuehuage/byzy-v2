@@ -130,7 +130,8 @@ const AfterSales: React.FC = () => {
                 const map: any = {
                     'PENDING': { badgeStatus: 'processing', text: '待审核' },
                     'PROCESSED': { badgeStatus: 'success', text: '已通过' },
-                    'REJECTED': { badgeStatus: 'error', text: '已驳回' }
+                    'REJECTED': { badgeStatus: 'error', text: '已驳回' },
+                    'CANCELLED': { badgeStatus: 'default', text: '用户取消' }
                 };
                 const cfg = map[status] || { badgeStatus: 'default', text: status };
                 return <Badge status={cfg.badgeStatus} text={cfg.text} />;
@@ -140,20 +141,20 @@ const AfterSales: React.FC = () => {
             title: '商品/尺码',
             key: 'items',
             render: (_, r) => {
-                const formatSize = (size: string, isSpecial: boolean, h: number | null, w: number | null) => {
-                    if (isSpecial || size.includes('特殊')) {
-                        return <Tag color="purple">特殊:{h}cm/{w}斤</Tag>;
+                const formatSize = (record: AfterSalesRecord, isTarget: boolean = false) => {
+                    const isSpecial = record.isSpecialSize;
+                    const size = isTarget ? record.newSize : record.originalSize;
+
+                    if (isSpecial || (size && size.includes('特殊'))) {
+                        return <Tag color="purple">特殊尺码</Tag>;
                     }
-                    return <Text strong>{size || '—'}</Text>;
+                    return <Text strong>{size || (isTarget ? '160#' : '—')}</Text>;
                 };
 
                 if (r.type === 'EXCHANGE') {
-                    const newSizeDisplay = r.isSpecialSize
-                        ? <Tag color="purple">特殊:{r.height}cm/{r.weight}斤</Tag>
-                        : <Text strong style={{ color: '#1677ff' }}>{r.newSize || '160#'}</Text>;
                     return <div className="flex flex-col gap-1">
-                        <Text type="secondary" style={{ fontSize: 11 }}>原: {formatSize(r.originalSize, r.isSpecialSize, r.height, r.weight)}</Text>
-                        <Text type="secondary" style={{ fontSize: 11 }}>换: {newSizeDisplay}</Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>原: {formatSize(r, false)}</Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>换: {formatSize(r, true)}</Text>
                     </div>;
                 }
                 const name = getProductName(r.product);
@@ -161,7 +162,7 @@ const AfterSales: React.FC = () => {
                     <div className="flex flex-col gap-1">
                         <Text strong>{name}</Text>
                         <Text type="secondary" style={{ fontSize: 11 }}>
-                            尺码: {formatSize(r.originalSize, !!r.isSpecialSize, r.height, r.weight)}
+                            尺码: {formatSize(r, false)}
                         </Text>
                     </div>
                 );

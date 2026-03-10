@@ -561,7 +561,7 @@ export default function QueryDetailPage({ params }: { params: Promise<{ schoolId
                         size="large"
                         block
                         className="h-14 rounded-2xl font-bold text-lg shadow-xl shadow-blue-100"
-                        onClick={() => router.push('/')}
+                        onClick={() => router.push(`/${schoolId}`)}
                     >
                         回到主页
                     </Button>
