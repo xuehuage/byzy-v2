@@ -486,10 +486,12 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
                                     <span className="text-gray-600">学生姓名：</span>
                                     <span className="font-medium">{studentInfo?.name || '未知'}</span>
                                 </div>
-                                {studentInfo?.id_card && (
+                                {(studentInfo?.grade_name || (studentInfo?.class_name && studentInfo.class_name !== '未分班')) && (
                                     <div className="flex justify-between py-2 border-b border-gray-200">
-                                        <span className="text-gray-600">身份证号：</span>
-                                        <span className="font-medium">{studentInfo.id_card}</span>
+                                        <span className="text-gray-600">年级/班级：</span>
+                                        <span className="font-medium">
+                                            {studentInfo.grade_name || ''} {studentInfo.class_name && studentInfo.class_name !== '未分班' ? studentInfo.class_name : ''}
+                                        </span>
                                     </div>
                                 )}
                                 {studentInfo?.phone && (
@@ -502,14 +504,6 @@ export default function SimplePaymentContent({ schoolId }: { schoolId?: string }
                                     <div className="flex justify-between py-2 border-b border-gray-200">
                                         <span className="text-gray-600">出生日期：</span>
                                         <span className="font-medium">{studentInfo.birthday}</span>
-                                    </div>
-                                )}
-                                {studentInfo?.class_name && studentInfo.class_name !== '未分班' && (
-                                    <div className="flex justify-between py-2 border-b border-gray-200">
-                                        <span className="text-gray-600">所属班级：</span>
-                                        <span className="font-medium">
-                                            {studentInfo.grade_name || ''}{studentInfo.class_name}
-                                        </span>
                                     </div>
                                 )}
                             </div>
