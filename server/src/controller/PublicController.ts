@@ -65,7 +65,10 @@ export class PublicController {
                     exchanges: exchanges,
                     price: (item.priceSnapshot || 0).toString(),
                     uniform_type: uType,
-                    product_name: item.product?.name || (uType === 1 ? "夏季校服" : (uType === 2 ? "春秋校服" : "冬季校服"))
+                    product_name: item.product?.name || (uType === 1 ? "夏季校服" : (uType === 2 ? "春秋校服" : "冬季校服")),
+                    is_special_size: !!item.isSpecialSize,
+                    height: item.height,
+                    weight: item.weight
                 }
             })
 
