@@ -43,6 +43,7 @@ export interface AfterSalesRecord {
     isSpecialSize: boolean
     height: number | null
     weight: number | null
+    productId?: number
     createdAt: string
     order?: Order
     product?: any

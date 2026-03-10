@@ -142,10 +142,20 @@ const AfterSales: React.FC = () => {
             key: 'items',
             render: (_, r) => {
                 const formatSize = (record: AfterSalesRecord, isTarget: boolean = false) => {
-                    const isSpecial = record.isSpecialSize;
                     const size = isTarget ? record.newSize : record.originalSize;
 
-                    if (isSpecial || (size && size.includes('特殊'))) {
+                    // Direct check
+                    let isSpecial = record.isSpecialSize || (size && size.includes('特殊'));
+
+                    // Fallback: If originalSize is the legacy fallback text, check the order items
+                    if (!isTarget && !isSpecial && size === '以实际发放为准') {
+                        const productItem = record.order?.items?.find((it: any) => it.productId === record.productId);
+                        if (productItem?.isSpecialSize || productItem?.is_special_size) {
+                            isSpecial = true;
+                        }
+                    }
+
+                    if (isSpecial) {
                         return <Tag color="purple">特殊尺码</Tag>;
                     }
                     return <Text strong>{size || (isTarget ? '160#' : '—')}</Text>;
@@ -266,11 +276,20 @@ const AfterSales: React.FC = () => {
                         <Descriptions.Item label="订单号">{selectedRecord.order?.orderNo || `#${selectedRecord.orderId}`}</Descriptions.Item>
 
                         <Descriptions.Item label="当前/原尺码">
-                            {selectedRecord.isSpecialSize ? (
-                                <Tag color="purple">特殊尺码 ({selectedRecord.height}cm / {selectedRecord.weight}斤)</Tag>
-                            ) : (
-                                selectedRecord.originalSize || '—'
-                            )}
+                            {(() => {
+                                const isSpecial = selectedRecord.isSpecialSize || (selectedRecord.originalSize && selectedRecord.originalSize.includes('特殊'));
+                                if (isSpecial) {
+                                    return <Tag color="purple">特殊尺码 ({selectedRecord.height}cm / {selectedRecord.weight}斤)</Tag>;
+                                }
+                                // Fallback for legacy records
+                                if (selectedRecord.originalSize === '以实际发放为准') {
+                                    const productItem = selectedRecord.order?.items?.find((it: any) => it.productId === selectedRecord.productId);
+                                    if (productItem?.isSpecialSize || productItem?.is_special_size) {
+                                        return <Tag color="purple">特殊尺码 ({productItem.height}cm / {productItem.weight}斤)</Tag>;
+                                    }
+                                }
+                                return selectedRecord.originalSize || '—';
+                            })()}
                         </Descriptions.Item>
 
                         {selectedRecord.type === 'EXCHANGE' ? (
