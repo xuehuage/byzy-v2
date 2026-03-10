@@ -9,6 +9,8 @@ import { WebSocketService } from "../websocket"
 
 import { PaymentService } from "../services/PaymentService"
 import { OrderTemp } from "../entity/OrderTemp"
+import { Grade } from "../entity/Grade"
+import { Class } from "../entity/Class"
 
 export class PublicController {
     static async getSchool(req: Request, res: Response) {
@@ -280,6 +282,20 @@ export class PublicController {
 
             const items = JSON.parse(orderTemp.items)
 
+            // Fetch grade and class names
+            let gradeName = "未知年级"
+            let className = "未分班"
+
+            if (orderTemp.gradeId) {
+                const grade = await AppDataSource.getRepository(Grade).findOneBy({ id: orderTemp.gradeId })
+                if (grade) gradeName = grade.name
+            }
+
+            if (orderTemp.classId) {
+                const cls = await AppDataSource.getRepository(Class).findOneBy({ id: orderTemp.classId })
+                if (cls) className = cls.name
+            }
+
             return res.json({
                 code: 200,
                 data: {
@@ -287,7 +303,10 @@ export class PublicController {
                         name: orderTemp.studentName,
                         phone: orderTemp.studentPhone,
                         birthday: orderTemp.studentBirthday,
-                        gradeId: orderTemp.gradeId
+                        gradeId: orderTemp.gradeId,
+                        classId: orderTemp.classId,
+                        grade_name: gradeName,
+                        class_name: className
                     },
                     orders: items.map((item: any) => ({
                         ...item,
